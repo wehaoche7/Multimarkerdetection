@@ -152,7 +152,7 @@ def load_marker_obj_dict(csv_path, obj_name="CoM"):
             #     R=euler_deg_to_RzRyRx([36,162,116.57]).T
             T_marker_obj[:3,:3] = R.T
             T_marker_obj[:3,3]  = t
-            print(mid, T_marker_obj)
+            # print(mid, T_marker_obj)
             out[mid] = T_marker_obj
 
     return out
@@ -245,7 +245,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             midstesting = list(testing.keys())
             
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.01)
-        #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out
+        #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out for 
         # if len(mids) < 2: 
         print("Consistency check skipped: <2 markers detected in left frame.")
         T_correct = np.eye(4)
@@ -254,13 +254,13 @@ def detection(path, shape, distance, tag=None, degrees=None):
             
             T_cam_obj = T_cam_marker_meas_left[length] @ marker_obj_dict[length]
             T_cam_obj_correct = T_cam_marker_meas_left[length] @ marker_obj_dict[length]@T_correct
-            print("T_cam_obj", T_cam_obj,"T_cam_obj_correct", T_cam_obj_correct)
+            # print("T_cam_obj", T_cam_obj,"T_cam_obj_correct", T_cam_obj_correct)
             
             
         for longth in midstesting:
-            print("Testing results assembled marker obj", testing[longth])
+            # print("Testing results assembled marker obj", testing[longth])
             T_cam_obj_C = T_cam_marker_meas_left[longth] @ testing[longth]
-            print("T_can_obj_C", T_cam_obj_C)
+            # print("T_can_obj_C", T_cam_obj_C)
 
             
 
