@@ -138,7 +138,7 @@ def load_marker_obj_dict(csv_path, obj_name="CoM"):
             t = np.array([tx, ty, tz], float)
             t[np.abs(t) < EPS] = 0.0
             T_marker_obj = np.eye(4)
-            T_marker_obj[:3,:3] = R.T
+            T_marker_obj[:3,:3] = R
             T_marker_obj[:3,3]  = t
             out[mid] = T_marker_obj
 
@@ -178,9 +178,7 @@ def Rz(theta):
 def detection(path, shape, distance, tag=None, degrees=None):
     T_cam_marker_meas_right = {}
     T_cam_marker_meas_left = {}
-    testing = {}
     mids = []
-    midstesting = []
     img=cv2.imread(path)
     h,w = img.shape[:2]
     left = img[:,:w//2]
@@ -194,9 +192,11 @@ def detection(path, shape, distance, tag=None, degrees=None):
     print("Markers detected right:", ids2)
 
     if shape == "Square":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_CoM_semicolon.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Auco_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Dodecahedron":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_test_fileCoM_semicolon.csv", obj_name="CoM")
+        # marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
+    
     # elif shape == "Icosahedron":
     #     marker_obj_dict = buildMarkers(icosahedron_markers)
     
@@ -231,10 +231,10 @@ def detection(path, shape, distance, tag=None, degrees=None):
             T_cam_obj = T_cam_marker_meas_left[mids[0]] @ marker_obj_dict[mids[0]]
 
             R_obj_left = T_cam_obj[:3, :3]
-            tVec_obj_left = T_cam_obj[:3, :3]
+            tVec_obj_left = T_cam_obj[:3, 3]
             rVec_obj_left,_  = cv2.Rodrigues(R_obj_left)
-
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+            
         else:
             A, score, perB = referencePicker(mids, T_cam_marker_meas_left, marker_obj_dict)
 
