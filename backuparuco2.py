@@ -64,26 +64,26 @@ icosahedron_markers = {
     211: {"t": (-0.00001,  0.00001, -0.03418), "r_deg": (0.00, 0.00, 0.00)},
 }
 
-# def referencePicker(mids, T_cam_marker_meas, marker_obj_dict):
-#     bestA = None
-#     bestScore = float("inf")
-#     bestB = None
-#     for A in mids:
-#         T_cam_obj_ref = T_cam_marker_meas[A] @ marker_obj_dict[A]
-#         totalScore = 0.0
-#         perB = {}
-#         for B in mids:
-#             if B == A:
-#                 continue
-#             res = best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas[B], marker_obj_dict[B])
-#             score = res["dang"] + 50.0*res["dt"]
-#             totalScore += score
-#             perB[B] = res
-#         if totalScore < bestScore:
-#             bestScore = totalScore
-#             bestA = A
-#             bestB = perB
-#     return bestA, bestScore, bestB
+def referencePicker(mids, T_cam_marker_meas, marker_obj_dict):
+    bestA = None
+    bestScore = float("inf")
+    bestB = None
+    for A in mids:
+        T_cam_obj_ref = T_cam_marker_meas[A] @ marker_obj_dict[A]
+        totalScore = 0.0
+        perB = {}
+        for B in mids:
+            if B == A:
+                continue
+            res = best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas[B], marker_obj_dict[B])
+            score = res["dang"] + 50.0*res["dt"]
+            totalScore += score
+            perB[B] = res
+        if totalScore < bestScore:
+            bestScore = totalScore
+            bestA = A
+            bestB = perB
+    return bestA, bestScore, bestB
 
 
 def Hmatrix(tXYZ,R):
@@ -134,25 +134,12 @@ def load_marker_obj_dict(csv_path, obj_name="CoM"):
                 [float(row["r31"]), float(row["r32"]), float(row["r33"])],
             ], dtype=float)
 
-            
-
-
             R[np.abs(R) < EPS] = 0.0
             t = np.array([tx, ty, tz], float)
             t[np.abs(t) < EPS] = 0.0
-
             T_marker_obj = np.eye(4)
-            # if mid == 5:
-            #     R=euler_deg_to_RzRyRx([0,121.72,116.57])
-            # if mid == 174:
-            #     R=euler_deg_to_RzRyRx([0,121.72,116.57])    
-            # if mid == 147:
-            #     R=euler_deg_to_RzRyRx([144,162,63.43]).T
-            # if mid == 133:
-            #     R=euler_deg_to_RzRyRx([36,162,116.57]).T
             T_marker_obj[:3,:3] = R.T
             T_marker_obj[:3,3]  = t
-            # print(mid, T_marker_obj)
             out[mid] = T_marker_obj
 
     return out
@@ -230,146 +217,118 @@ def detection(path, shape, distance, tag=None, degrees=None):
             R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
 
             # the actual T matrices used for calculation
-            T = np.eye(4)
-            T[:3,:3] = R_cam_marker
-            T[:3,3]  = tVecs_markers_left[:,0]
-            T_cam_marker_meas_left[mid1] = T
-            #T matrices used for validation and correction (these and subsequent related code can be ignored)
-            T_test = np.eye(4)
-            T_test[:3,:3] = marker_obj_dict[mid1][:3,:3].T
-            T_test[:3,3] = marker_obj_dict[mid1][:3,3]
-            
-            testing[mid1] = T_test
+            T_left = np.eye(4)
+            T_left[:3,:3] = R_cam_marker
+            T_left[:3,3] = tVecs_markers_left.reshape(3)
+            T_cam_marker_meas_left[mid1] = T_left
+
             mids = list(T_cam_marker_meas_left.keys())
-            
-            midstesting = list(testing.keys())
             
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.01)
         #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out for 
-        # if len(mids) < 2: 
-        print("Consistency check skipped: <2 markers detected in left frame.")
-        T_correct = np.eye(4)
-        T_correct[:3,:3] = Rz(72)
-        for length in mids:
-            
-            T_cam_obj = T_cam_marker_meas_left[length] @ marker_obj_dict[length]
-            T_cam_obj_correct = T_cam_marker_meas_left[length] @ marker_obj_dict[length]@T_correct
-            # print("T_cam_obj", T_cam_obj,"T_cam_obj_correct", T_cam_obj_correct)
-            
-            
-        for longth in midstesting:
-            # print("Testing results assembled marker obj", testing[longth])
-            T_cam_obj_C = T_cam_marker_meas_left[longth] @ testing[longth]
-            # print("T_can_obj_C", T_cam_obj_C)
+        if len(mids) < 2: 
+            print("Consistency check skipped: <2 markers detected in left frame.")
+            T_cam_obj = T_cam_marker_meas_left[mids[0]] @ marker_obj_dict[mids[0]]
 
+            R_obj_left = T_cam_obj[:3, :3]
+            tVec_obj_left = T_cam_obj[:3, :3]
+            rVec_obj_left,_  = cv2.Rodrigues(R_obj_left)
+
+            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+        else:
+            A, score, perB = referencePicker(mids, T_cam_marker_meas_left, marker_obj_dict)
+
+            inliers = [A]
+            outliers = []
+            yaw_dict = {A:0}
+            for B, res in perB.items():
+                if res["dang"] > 12.0 or res["dt"] > 0.02:
+                    outliers.append(B)
+                else:
+                    inliers.append(B)
+                    yaw_dict[B] = res["yaw"]
             
-
-
-        
-
-        R_obj = T_cam_obj[:3, :3]
-        T_obj = T_cam_obj[:3, 3]
-        rVec_obj_left,_  =cv2.Rodrigues(R_obj)
-        tVec_obj_left = T_obj
-        cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
-        # else:
-        #     A, score, perB = referencePicker(mids, T_cam_marker_meas_left, marker_obj_dict)
-
-        #     inliers = [A]
-        #     outliers = []
-        #     yaw_dict = {A:0}
-        #     for B, res in perB.items():
-        #         if res["dang"] > 12.0 or res["dt"] > 0.02:
-        #             outliers.append(B)
-        #         else:
-        #             inliers.append(B)
-        #             yaw_dict[B] = res["yaw"]
-            
-        #     print("left inliers:", inliers, "left outliers:", outliers)
-        #     T_list = []
-        #     for mid in inliers:
-        #         yaw = yaw_dict.get(mid, 0)
-        #         T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
-        #         T_list.append(T_cam_marker_meas_left[mid]@T_marker_obj_correct)
-        #     T_cam_obj = fuse_T(T_list)
-        # T_cam_obj = T_cam_marker_meas_left[133] @ marker_obj_dict[133]
-        # R_obj= T_cam_obj[:3, :3]
-        # T_obj = T_cam_obj[:3, 3]
-        # rVec_obj_left,_  =cv2.Rodrigues(R_obj)
-        # tVec_obj_left = T_obj
-        # cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
-        # print("Detected IDs:", ids1.flatten() if ids1 is not None else None)
+            print("left inliers:", inliers, "left outliers:", outliers)
+            T_list = []
+            for mid in inliers:
+                yaw = yaw_dict.get(mid, 0)
+                T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
+                T_list.append(T_cam_marker_meas_left[mid]@T_marker_obj_correct)
+            T_cam_obj = fuse_T(T_list)
+            R_obj= T_cam_obj[:3, :3]
+            T_obj = T_cam_obj[:3, 3]
+            rVec_obj_left,_  =cv2.Rodrigues(R_obj)
+            tVec_obj_left = T_obj
+            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+            print("Detected IDs:", ids1.flatten() if ids1 is not None else None)
     
         
     
-    # if ids2 is not None:
-    #     cv2.aruco.drawDetectedMarkers(right, corners2, ids2)
-    #     for corner2, mid2 in zip(corners2, ids2.flatten()):
-    #         size = getMarkerSize(mid2, shape)
-    #         if size is None:
-    #             continue
-    #         if not (size > 0):
-    #             print("BAD size:", size, "for id", int(mid2), "shape", shape)
-    #             continue
+    if ids2 is not None:
+        cv2.aruco.drawDetectedMarkers(right, corners2, ids2)
+        for corner2, mid2 in zip(corners2, ids2.flatten()):
+            size = getMarkerSize(mid2, shape)
+            if size is None:
+                print("BAD size:", size, "for id", int(mid2), "shape", shape)
+                continue
+            if not (size > 0):
+                print("BAD size:", size, "for id", int(mid2), "shape", shape)
+                continue
 
-    #         rVecs_markers_right, tVecs_markers_right, _ = aruco.estimatePoseSingleMarkers(corner2, size, cameraMatrixRight, distortionCoefficientsRight)
-    #         testrVec_markers_right = rVecs_markers_right.reshape(3,1)
-    #         testtVec_markers_right = tVecs_markers_right.reshape(3,1)
-    #         R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
-    #         T_cam_marker = np.eye(4)
-    #         T_cam_marker[:3,:3] = R_cam_marker
-    #         T_cam_marker[:3,3]  = testtVec_markers_right[:,0]
-    #         T_marker_obj = marker_obj_dict[mid2]
-
-    #         T = np.eye(4)
-    #         T[:3,:3] = R_cam_marker
-    #         T[:3,3]  = tVecs_markers_right[:,0]
-    #         T_cam_marker_meas_right[mid2] = T
-    #         mids = list(T_cam_marker_meas_right.keys())
-    #         cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVecs_markers_right, tVecs_markers_right, 0.01)
-    #     if len(mids) < 2:
-    #         print("Consistency check skipped: <2 markers detected in right frame.")
-    #         T_cam_obj = T_cam_marker_meas_right[mids[0]] @ marker_obj_dict[mids[0]]
+            rVecs_markers_right, tVecs_markers_right, _ = aruco.estimatePoseSingleMarkers(corner2, size, cameraMatrixRight, distortionCoefficientsRight)
             
-    #         R_obj = T_cam_obj[:3, :3]
-    #         T_obj = T_cam_obj[:3, 3]
-    #         rVec_obj_right,_  =cv2.Rodrigues(R_obj)
-    #         tVec_obj_right = T_obj
+            testrVec_markers_right = rVecs_markers_right.reshape(3,1)
+            R_right_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
 
-    #         cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-    #     else:
-    #         A, score, perB = referencePicker(mids, T_cam_marker_meas_right, marker_obj_dict)
+            T_right = np.eye(4)
+            T_right[:3,:3] = R_right_cam_marker
+            T_right[:3,3]  = tVecs_markers_right.reshape(3)
+            T_cam_marker_meas_right[mid2] = T_right
 
-    #         inliers = [A]
-    #         outliers = []
-    #         yaw_dict = {A:0}
-    #         for B, res in perB.items():
-    #             if res["dang"] > 12.0 or res["dt"] > 0.02:
-    #                 outliers.append(B)
-    #             else:
-    #                 inliers.append(B)
-    #                 yaw_dict[B] = res["yaw"]
+            mids = list(T_cam_marker_meas_right.keys())
+            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVecs_markers_right, tVecs_markers_right, 0.01)
+        if len(mids) < 2:
+            print("Consistency check skipped: <2 markers detected in right frame.")
+            T_cam_obj = T_cam_marker_meas_right[mids[0]] @ marker_obj_dict[mids[0]]
             
-    #         print("right inliers:", inliers, "right outliers:", outliers)
-    #         T_list = []
-    #         for mid in inliers:
-    #             yaw = yaw_dict.get(mid, 0)
-    #             # T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
-    #             T_list.append(T_cam_marker_meas_right[mid]@marker_obj_dict)
-    #         T_cam_obj = fuse_T(T_list)
+            R_obj_right = T_cam_obj[:3, :3]
+            tVec_obj_right = T_cam_obj[:3, 3]
+            rVec_obj_right,_  = cv2.Rodrigues(R_obj_right)
 
-    #         R_multipleMarker = T_cam_obj[:3, :3]
-    #         T_multipleMarker = T_cam_obj[:3, 3]
-    #         rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
-    #         tVec_obj_right = T_multipleMarker
-    #         cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
+            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
+        else:
+            A, score, perB = referencePicker(mids, T_cam_marker_meas_right, marker_obj_dict)
+
+            inliers = [A]
+            outliers = []
+            yaw_dict = {A:0}
+            for B, res in perB.items():
+                if res["dang"] > 12.0 or res["dt"] > 0.02:
+                    outliers.append(B)
+                else:
+                    inliers.append(B)
+                    yaw_dict[B] = res["yaw"]
+            
+            print("right inliers:", inliers, "right outliers:", outliers)
+            T_list = []
+            for mid in inliers:
+                yaw = yaw_dict.get(mid, 0)
+                # T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
+                T_list.append(T_cam_marker_meas_right[mid]@marker_obj_dict[mid])
+            T_cam_obj = fuse_T(T_list)
+
+            R_multipleMarker = T_cam_obj[:3, :3]
+            T_multipleMarker = T_cam_obj[:3, 3]
+            rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
+            tVec_obj_right = T_multipleMarker
+            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
 
 
 
             
             
 
-            # print("Detected IDs:", ids2.flatten() if ids2 is not None else None)
+            print("Detected IDs:", ids2.flatten() if ids2 is not None else None)
 
         
 
@@ -395,29 +354,29 @@ def pose_delta(T_a, T_b):
     ang = np.arccos(np.clip((np.trace(R)-1)/2, -1, 1))
     return dt, np.degrees(ang)
 
-# def Rz(rad):
-#     c, s = np.cos(rad), np.sin(rad)
-#     return np.array([[c,-s,0],
-#                      [s, c,0],
-#                      [0, 0,1]], float)
+def Rz(rad):
+    c, s = np.cos(rad), np.sin(rad)
+    return np.array([[c,-s,0],
+                     [s, c,0],
+                     [0, 0,1]], float)
 
-# def apply_marker_yaw_to_T_marker_obj(T_marker_obj, yaw_deg):
-#     yaw = np.deg2rad(yaw_deg)
-#     T_corr = np.eye(4)
-#     T_corr[:3,:3] = Rz(yaw)
+def apply_marker_yaw_to_T_marker_obj(T_marker_obj, yaw_deg):
+    yaw = np.deg2rad(yaw_deg)
+    T_corr = np.eye(4)
+    T_corr[:3,:3] = Rz(yaw)
 
-#     return T_marker_obj @ T_corr
+    return T_marker_obj @ T_corr
 
-# def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
-#     best = None
-#     for yaw_deg in (0, 90, 180, 270):
-#         T_marker_obj_try = apply_marker_yaw_to_T_marker_obj(T_marker_obj_B, yaw_deg)
-#         T_cam_marker_pred = T_cam_obj_ref @ np.linalg.inv(T_marker_obj_try)
-#         dt, dang = pose_delta(T_cam_marker_pred, T_cam_marker_meas_B)
-#         score = dang 
-#         if best is None or score < best["score"]:
-#             best = {"yaw": yaw_deg, "dt": dt, "dang": dang, "score": score}
-#     return best
+def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
+    best = None
+    for yaw_deg in (0, 90, 180, 270):
+        T_marker_obj_try = apply_marker_yaw_to_T_marker_obj(T_marker_obj_B, yaw_deg)
+        T_cam_marker_pred = T_cam_obj_ref @ np.linalg.inv(T_marker_obj_try)
+        dt, dang = pose_delta(T_cam_marker_pred, T_cam_marker_meas_B)
+        score = dang 
+        if best is None or score < best["score"]:
+            best = {"yaw": yaw_deg, "dt": dt, "dang": dang, "score": score}
+    return best
 #camera matrix coefficients for left (1) and right (2) and distortion coefficients for left and right
 fx1 = 772.2
 fy1 = 772.345
