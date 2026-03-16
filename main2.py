@@ -3,6 +3,7 @@ from pupil_apriltags import Detector
 import os
 from pathlib import Path
 import numpy as np
+import csv
 print(cv2.__version__)
 
 imgpath=Path(r"C:\Users\wehao\Downloads\Python\Markers")
@@ -23,33 +24,6 @@ sizeByShape = {
                      45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01}
 }
 
-dodecahedron_markers = {
-
-    # upper markers
-    462: {"t": ( 0.01368,  0.01883, -0.01165), "r_deg": ( 36.00,  68.79,  63.43)},
-    556: {"t": (-0.01368,  0.01883, -0.01165), "r_deg": (144.00,  68.79,  63.40)},
-    300: {"t": (-0.02213, -0.00719, -0.01165), "r_deg": (108.00,  97.94,  63.43)},
-    70:  {"t": ( 0.00000, -0.02327, -0.01165), "r_deg": (  0.00, 116.57,  63.43)},
-    340: {"t": ( 0.02213, -0.00719, -0.01165), "r_deg": (108.00,  97.94,  63.43)},
-
-    # under markers
-    360: {"t": ( 0.02213,  0.00719,  0.01162), "r_deg": (108.00,  97.94, 116.53)},
-    386: {"t": ( 0.00000,  0.02327,  0.01162), "r_deg": (  0.00, 116.57, 116.57)},
-    183: {"t": (-0.02213,  0.00719,  0.01162), "r_deg": ( 72.00,  97.94, 116.57)},
-    493: {"t": (-0.01368, -0.01883,  0.01162), "r_deg": (144.00,  68.79, 116.57)},
-    284: {"t": ( 0.01368, -0.01883,  0.01162), "r_deg": (144.00,  68.79, 116.57)},
-
-    # top marker
-    193: {"t": ( 0.00000,  0.00000, -0.02603), "r_deg": (108.00, 108.00,   0.00)},
-}
-
-square_markers = {
-    146: {"t": ( -0.025,  0,  0), "r_deg": (90, 90, 90)},
-    12: {"t": (  0, -0.025,  0), "r_deg": ( 0, 90, 90)},
-    206: {"t": (0.025,  0,  0), "r_deg": (90, 90, 90)},
-    255: {"t": (  0,0.025,  0), "r_deg": ( 0, 90, 90)},
-    173: {"t": (  0,  0, -0.025), "r_deg": ( 0,  0,  0)},
-}
 
 icosahedron_markers = {
 
@@ -116,6 +90,37 @@ def pose_delta(T_a, T_b):
     ang = np.arccos(np.clip((np.trace(R)-1)/2, -1, 1))
     return dt, np.degrees(ang)
 
+def load_marker_obj_dict(csv_path, obj_name="CoM"):
+    out = {}
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        for row in reader:
+            name = row["name"].strip()
+            if name.lower() == obj_name.lower():
+                continue
+
+            try:
+                mid = int(name)
+            except:
+                continue
+
+            tx = float(row["tx"]); ty = float(row["ty"]); tz = float(row["tz"])
+            R = np.array([
+                [float(row["r11"]), float(row["r12"]), float(row["r13"])],
+                [float(row["r21"]), float(row["r22"]), float(row["r23"])],
+                [float(row["r31"]), float(row["r32"]), float(row["r33"])],
+            ], dtype=float)
+
+            R[np.abs(R) < EPS] = 0.0
+            t = np.array([tx, ty, tz], float)
+            t[np.abs(t) < EPS] = 0.0
+            T_marker_obj = np.eye(4)
+            T_marker_obj[:3,:3] = R
+            T_marker_obj[:3,3]  = t
+            out[mid] = T_marker_obj
+
+    return out
+
 
 def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
     best = None
@@ -146,56 +151,9 @@ def choosePose(corners, imagePoints, cameraMatrix, distortionCoefficients):
             best = (rVecs, tVecs)
     return best
 
-def buildMarkers(markers):
-    output = {}
-    for mid, d in markers.items():
-        
-        T_marker_CoM = np.array(d["t"], float)
-        T_CoM_marker= -T_marker_CoM
-        R_obj_marker = facePlane(d["t"], outward=True, up = (0, 0, 1), eps = 1e-9)
-        T_obj_marker = Hmatrix(T_CoM_marker, R_obj_marker)
-        T_marker_obj = np.linalg.inv(T_obj_marker)
-
-        output[mid]  = T_marker_obj
-    return output
-
-def Hmatrix(tXYZ,R):
-    T=np.eye(4)
-    T[:3,:3] = R
-    T[:3,3] = np.array(tXYZ, dtype = float)
-
-    return T
-
-def facePlane(tXYZ, outward=True, up =(0, 0, 1), eps = 1e-9):
-    t = np.array(tXYZ, dtype = float)
-    up = np.array(up, dtype = float)
-    up /= np.linalg.norm(up) + 1e-12
-    z = -t
-    z /= np.linalg.norm(z) + 1e-12
-    if not outward:
-        z = -z
-    y = up - (up @ z) * z
-    normalizedY = np.linalg.norm(y)
-
-    if normalizedY < eps:
-        alt = np.array([1,0,0], float)
-        if abs(alt @ z) > 0.9:
-            alt = np.array([0,1,0], float)
-        y = alt - (alt @ z) * z
-        y /= np.linalg.norm(y) + 1e-12
-    else:
-        y /= normalizedY
-
-    x = np.cross(y,z)
-    x /= np.linalg.norm(x) + 1e-12
-    y=np.cross(z,x)
-    y /= np.linalg.norm(y) + 1e-12
-
-    return np.column_stack([x,y,z])
 
 def getMarkerSize(markerId, shape):
     markerId = int(markerId)
-    print(markerId)
     return sizeByShape.get(shape, {}).get(markerId, None)
 
 def cornerStone(markerSize):
@@ -261,8 +219,8 @@ def detection(path, shape, distance, tag=None, degrees=None):
     used_clahe_L = False
     used_clahe_R = False
 
-    dL= dL_Raw
-    dR= dR_Raw  
+    dL = dL_Raw
+    dR = dR_Raw  
     if len(dL_Raw) == 0:
         dL = detector.detect(clahe.apply(left_g))
         used_clahe_L = True
@@ -271,9 +229,11 @@ def detection(path, shape, distance, tag=None, degrees=None):
         used_clahe_R = True
     
     if shape == "Square":
-        marker_obj_dict = buildMarkers(square_markers)
+        # marker_obj_dict = buildMarkers(square_markers)
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Dodecahedron":
-        marker_obj_dict = buildMarkers(dodecahedron_markers)
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
+        # marker_obj_dict = buildMarkers(dodecahedron_markers)
     elif shape == "Icosahedron":
         marker_obj_dict = buildMarkers(icosahedron_markers)
 
@@ -294,23 +254,12 @@ def detection(path, shape, distance, tag=None, degrees=None):
         rVec_markers_left, tVec_markers_left = choosePose(leftCornerPoints, imagePointLeft, cameraMatrixLeft, distortionCoefficientsLeft)
 
         testrVec_markers_left = rVec_markers_left.reshape(3,1)
-        testtVec_markers_left = tVec_markers_left.reshape(3,1)
         R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
-        T_cam_marker = np.eye(4)
-        T_cam_marker[:3,:3] = R_cam_marker
-        T_cam_marker[:3,3]  = testtVec_markers_left[:,0]
-        print(tagId)
-        T_marker_obj = marker_obj_dict[tagId]
-        T_cam_obj = T_cam_marker @ T_marker_obj 
-
         T = np.eye(4)
         T[:3,:3] = R_cam_marker
         T[:3,3]  = tVec_markers_left[:,0]
         T_cam_marker_meas_left[tagId] = T
         
-
-
-        # ok, rVecLeft, tVecLeft = cv2.solvePnP(leftCornerPoints, imagePointLeft, cameraMatrixLeft, distortionCoefficientsLeft)
         cv2.circle(left, center=(int(c.center[0]), int(c.center[1])), radius=5, color=(0, 250,0))
         cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_markers_left, tVec_markers_left, 0.01)
     mids_left = list(T_cam_marker_meas_left.keys())
@@ -327,23 +276,26 @@ def detection(path, shape, distance, tag=None, degrees=None):
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
     else:
         A, score, perB = referencePicker(mids_left, T_cam_marker_meas_left, marker_obj_dict)
-
+        print(A,T_cam_marker_meas_left[A]@marker_obj_dict[A])
         inliers = [A]
         outliers = []
         for B, res in perB.items():
             if res["dang"] > 12.0 or res["dt"] > 0.02:
                 outliers.append(B)
+                print("dang bro", B)
             else:
+                print("B",B)
                 inliers.append(B)
+                print(T_cam_marker_meas_left[B]@marker_obj_dict[B])
         
-        print("inliers:", inliers, "outliers:", outliers)
+        print("inliers left:", inliers, "outliers left:", outliers)
 
         T_list = [T_cam_marker_meas_left[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
         T_cam_obj = fuse_T(T_list)
 
         R_obj= T_cam_obj[:3, :3]
         T_obj = T_cam_obj[:3, 3]
-        rVec_obj_left,_  =cv2.Rodrigues(R_obj)
+        rVec_obj_left,_  = cv2.Rodrigues(R_obj)
         tVec_obj_left = T_obj
         cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
         print("Detected IDs:", tagId if tagId is not None else None)
@@ -368,15 +320,8 @@ def detection(path, shape, distance, tag=None, degrees=None):
         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
         rVec_markers_right, tVec_markers_right = choosePose(rightCornerPoints, imagePointRight, cameraMatrixRight, distortionCoefficientsRight)
         testrVec_markers_right = rVec_markers_right.reshape(3,1)
-        testtVec_markers_right = tVec_markers_right.reshape(3,1)
         R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
-        T_cam_marker = np.eye(4)
-        T_cam_marker[:3,:3] = R_cam_marker
-        T_cam_marker[:3,3]  = testtVec_markers_right[:,0]
         print(tagId)
-        T_marker_obj = marker_obj_dict[tagId]
-        T_cam_obj = T_cam_marker @ T_marker_obj 
-
         T = np.eye(4)
         T[:3,:3] = R_cam_marker
         T[:3,3]  = tVec_markers_right[:,0]
@@ -444,6 +389,8 @@ distance = ["0.25", "0.5", "0.75", "1"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
+
+EPS = 1E-6
 
 fx1 = 772.2
 fy1 = 772.345

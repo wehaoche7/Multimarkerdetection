@@ -5,10 +5,7 @@ from pathlib import Path
 import csv
 print(cv2.__version__)
 
-squareSize = 0.036
-dodecahedronSize =0.019
-icosahedronSizePentagon = 0.01
-icosahedronSizeHexagon =  0.013
+
 size = None
 
 # Marker size per shape (note Icosahedron has two different marker sizes)
@@ -85,34 +82,6 @@ def referencePicker(mids, T_cam_marker_meas, marker_obj_dict):
             bestB = perB
     return bestA, bestScore, bestB
 
-
-def Hmatrix(tXYZ,R):
-    T=np.eye(4)
-    T[:3,:3] = R
-    T[:3,3] = np.array(tXYZ, dtype = float)
-
-    return T
-
-def euler_deg_to_RzRyRx(r_deg):
-    rx, ry, rz = np.deg2rad(r_deg)
-    cx, sx = np.cos(rx), np.sin(rx)
-    cy, sy = np.cos(ry), np.sin(ry)
-    cz, sz = np.cos(rz), np.sin(rz)
-
-    Rx = np.array([[1,0,0],
-                   [0,cx,-sx],
-                   [0,sx,cx]], float)
-    Ry = np.array([[cy,0,sy],
-                   [0,1,0],
-                   [-sy,0,cy]], float)
-    Rz = np.array([[cz,-sz,0],
-                   [sz, cz,0],
-                   [0,  0,1]], float)
-
-    return Rz @ Ry @ Rx
-
-
-
 def load_marker_obj_dict(csv_path, obj_name="CoM"):
     out = {}
     with open(csv_path, newline="", encoding="utf-8") as f:
@@ -166,14 +135,6 @@ def fuse_T(T_list):
     T[:3,3] = t
     return T
 
-def Rz(theta):
-    cos = np.cos(np.deg2rad(theta))
-    sin = np.sin(np.deg2rad(theta))
-    k = np.array([[cos,-sin,0],
-    [sin, cos,0],
-    [0,   0,  1]])
-    return k
-
 
 def detection(path, shape, distance, tag=None, degrees=None):
     T_cam_marker_meas_right = {}
@@ -194,7 +155,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
     if shape == "Square":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Auco_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Dodecahedron":
-        # marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
     
     # elif shape == "Icosahedron":
@@ -212,7 +172,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 continue
 
             rVecs_markers_left, tVecs_markers_left, _ = aruco.estimatePoseSingleMarkers(corner1, size, cameraMatrixLeft, distortionCoefficientsLeft)
-
             testrVec_markers_left = rVecs_markers_left.reshape(3,1)
             R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
 
@@ -221,9 +180,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             T_left[:3,:3] = R_cam_marker
             T_left[:3,3] = tVecs_markers_left.reshape(3)
             T_cam_marker_meas_left[mid1] = T_left
-
             mids = list(T_cam_marker_meas_left.keys())
-            
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.01)
         #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out for 
         if len(mids) < 2: 
@@ -274,9 +231,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             if not (size > 0):
                 print("BAD size:", size, "for id", int(mid2), "shape", shape)
                 continue
-
             rVecs_markers_right, tVecs_markers_right, _ = aruco.estimatePoseSingleMarkers(corner2, size, cameraMatrixRight, distortionCoefficientsRight)
-            
             testrVec_markers_right = rVecs_markers_right.reshape(3,1)
             R_right_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
 
@@ -284,17 +239,15 @@ def detection(path, shape, distance, tag=None, degrees=None):
             T_right[:3,:3] = R_right_cam_marker
             T_right[:3,3]  = tVecs_markers_right.reshape(3)
             T_cam_marker_meas_right[mid2] = T_right
-
             mids = list(T_cam_marker_meas_right.keys())
             cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVecs_markers_right, tVecs_markers_right, 0.01)
+
         if len(mids) < 2:
             print("Consistency check skipped: <2 markers detected in right frame.")
             T_cam_obj = T_cam_marker_meas_right[mids[0]] @ marker_obj_dict[mids[0]]
-            
             R_obj_right = T_cam_obj[:3, :3]
             tVec_obj_right = T_cam_obj[:3, 3]
             rVec_obj_right,_  = cv2.Rodrigues(R_obj_right)
-
             cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
         else:
             A, score, perB = referencePicker(mids, T_cam_marker_meas_right, marker_obj_dict)
@@ -313,7 +266,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
             T_list = []
             for mid in inliers:
                 yaw = yaw_dict.get(mid, 0)
-                # T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
                 T_list.append(T_cam_marker_meas_right[mid]@marker_obj_dict[mid])
             T_cam_obj = fuse_T(T_list)
 
@@ -322,30 +274,18 @@ def detection(path, shape, distance, tag=None, degrees=None):
             rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
             tVec_obj_right = T_multipleMarker
             cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-
-
-
-            
-            
-
             print("Detected IDs:", ids2.flatten() if ids2 is not None else None)
-
-        
-
-    
-
 
     print(f"Currently inspecting: "
           f"{tag + ' ' if tag else ' '}"
             f"{shape + " at "}"
             f"{degrees + "°" + ' ' if degrees else ' '}" 
             f"{distance}m")
-    
     cv2.imshow('Detected Markers left', left)
     cv2.imshow('Detected Markers right', right)
-
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    
 def pose_delta(T_a, T_b):
     # returns translation diff (m) and rotation diff (deg)
     dT = np.linalg.inv(T_a) @ T_b
@@ -377,6 +317,7 @@ def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
         if best is None or score < best["score"]:
             best = {"yaw": yaw_deg, "dt": dt, "dang": dang, "score": score}
     return best
+
 #camera matrix coefficients for left (1) and right (2) and distortion coefficients for left and right
 fx1 = 772.2
 fy1 = 772.345
@@ -420,23 +361,17 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
                [0, fy2, cy2],
                [0, 0, 1]])
 
-
-
-
 aruco_dict=aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 parameters=aruco.DetectorParameters()
 detector=aruco.ArucoDetector(aruco_dict,parameters)
 
 imgpath=Path(r"C:\Users\wehao\Downloads\Python\Markers")
 
-
 shape = ["Square", "Dodecahedron", "Icosahedron"]
 distance = ["0.25", "0.5", "0.75", "1"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
-
-
 
 choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)")
 shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)")
