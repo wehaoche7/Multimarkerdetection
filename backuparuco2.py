@@ -135,8 +135,9 @@ def fuse_T(T_list):
     T[:3,3] = t
     return T
 
-
 def detection(path, shape, distance, tag=None, degrees=None):
+    global no_marker_count_left
+    global no_marker_count_right
     T_cam_marker_meas_right = {}
     T_cam_marker_meas_left = {}
     mids = []
@@ -146,19 +147,27 @@ def detection(path, shape, distance, tag=None, degrees=None):
     right = img[:,w//2:]
     left_gray  = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
     right_gray = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
-
+    counters["total"] += 1
     corners1,ids1,rejected1=detector.detectMarkers(left_gray)
     corners2,ids2,rejected2=detector.detectMarkers(right_gray)
-    print("Markers detected left:", ids1)
-    print("Markers detected right:", ids2)
+    print("\nMarkers detected left:", ids1.flatten() if ids1 is not None else None, "\n" )
+    print("Markers detected right:", ids2.flatten() if ids2 is not None else None, "\n" )
+
+    if ids1 is None:
+        counters["left_missing"] += 1
+        print("Missing left marker counter: ", counters["left_missing"])
+
+    if ids2 is None:
+        counters["right_missing"] += 1
+        print("Missing right marker counter: ", counters["right_missing"])
 
     if shape == "Square":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Auco_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Dodecahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
     
-    # elif shape == "Icosahedron":
-    #     marker_obj_dict = buildMarkers(icosahedron_markers)
+    elif shape == "Icosahedron":
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Aruco_fileCoM_semicolon - kopie.csv", obj_name="CoM")
     
     if ids1 is not None:
         cv2.aruco.drawDetectedMarkers(left, corners1, ids1)
@@ -184,9 +193,9 @@ def detection(path, shape, distance, tag=None, degrees=None):
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.01)
         #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out for 
         if len(mids) < 2: 
+
             print("Consistency check skipped: <2 markers detected in left frame.")
             T_cam_obj = T_cam_marker_meas_left[mids[0]] @ marker_obj_dict[mids[0]]
-
             R_obj_left = T_cam_obj[:3, :3]
             tVec_obj_left = T_cam_obj[:3, 3]
             rVec_obj_left,_  = cv2.Rodrigues(R_obj_left)
@@ -205,7 +214,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
                     inliers.append(B)
                     yaw_dict[B] = res["yaw"]
             
-            print("left inliers:", inliers, "left outliers:", outliers)
+            print("left inliers:", inliers,"\n", "left outliers:", outliers, "\n", sep="")
             T_list = []
             for mid in inliers:
                 yaw = yaw_dict.get(mid, 0)
@@ -217,8 +226,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             rVec_obj_left,_  =cv2.Rodrigues(R_obj)
             tVec_obj_left = T_obj
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
-            print("Detected IDs:", ids1.flatten() if ids1 is not None else None)
-    
+
         
     
     if ids2 is not None:
@@ -262,7 +270,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
                     inliers.append(B)
                     yaw_dict[B] = res["yaw"]
             
-            print("right inliers:", inliers, "right outliers:", outliers)
+            print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
             T_list = []
             for mid in inliers:
                 yaw = yaw_dict.get(mid, 0)
@@ -274,16 +282,43 @@ def detection(path, shape, distance, tag=None, degrees=None):
             rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
             tVec_obj_right = T_multipleMarker
             cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-            print("Detected IDs:", ids2.flatten() if ids2 is not None else None)
 
     print(f"Currently inspecting: "
           f"{tag + ' ' if tag else ' '}"
             f"{shape + " at "}"
             f"{degrees + "°" + ' ' if degrees else ' '}" 
             f"{distance}m")
+    
     cv2.imshow('Detected Markers left', left)
     cv2.imshow('Detected Markers right', right)
-    cv2.waitKey(0)
+
+
+
+
+    while True: 
+        print("Is the orientation of the object frame correct for the left image? Yes (1), No (2)\n")
+        key_left = cv2.waitKey(0) & 0xFF
+        if key_left == ord("1"):
+                counters["left_correct_objectframe"] +=1
+                print("Left orientation chosen to be correct\n")
+                break
+        elif key_left == ord("2"): 
+                print("Left orientation chosen to be incorrect\n")
+                break
+
+    while True: 
+        print("Is the orientation of the object frame correct for the right image? Yes (1), No (2)\n")
+        key_right = cv2.waitKey(0) & 0xFF
+        if key_right == ord("1"):
+                counters["right_correct_objectframe"] +=1
+                print("Right orientation chosen to be correct\n")
+                cv2.destroyAllWindows()
+                break
+        elif key_right == ord("2"): 
+                print("right orientation chosen to be correct\n")
+                break       
+
+        
     cv2.destroyAllWindows()
     
 def pose_delta(T_a, T_b):
@@ -349,6 +384,14 @@ k26 = 0.0000
 
 EPS = 1e-6
 
+counters = {
+    "left_missing": 0,
+    "right_missing": 0,
+    "left_correct_objectframe": 0,
+    "right_correct_objectframe": 0,
+    "total": 0
+}
+
 distortionCoefficientsLeft = np.array([k11, k12, p11, p12, k13, k14, k15, k16])
 
 distortionCoefficientsRight = np.array([k21, k22, p21, p22, k23, k24, k25, k26])
@@ -373,8 +416,8 @@ degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)")
-shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)")
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)\n")
+shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
 
 if int(shapechoice) == 4:
     shape_used = shape
@@ -402,7 +445,8 @@ elif int(choice) == 2:
                                 detection(f, shape_used[x], distance[l], tag[0], degrees[d])
 
 
-
-
-
+print("Markers missed left", counters["left_missing"],"/", counters["total"])
+print("Markers missed right", counters["right_missing"],"/", counters["total"])
+print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"])
+print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"])
 

@@ -216,11 +216,25 @@ def detection(path, shape, distance, tag=None, degrees=None):
     right_g = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
     dL_Raw=detector.detect(left_g)
     dR_Raw=detector.detect(right_g)
+    counters["total"] += 1
     used_clahe_L = False
     used_clahe_R = False
 
     dL = dL_Raw
     dR = dR_Raw  
+    tag_ids_left = [tags.tag_id for tags in dL]
+    tag_ids_right= [tags.tag_id for tags in dR]
+    print("\nMarkers detected left:", tag_ids_left if tag_ids_left is not None else None, "\n" )
+    print("Markers detected right:", tag_ids_right if tag_ids_right is not None else None, "\n" )
+
+    if not tag_ids_left:
+        counters["left_missing"] += 1
+        print("Missing left marker counter: ", counters["left_missing"])
+
+    if not tag_ids_right:
+        counters["right_missing"] += 1
+        print("Missing right marker counter: ", counters["right_missing"])
+
     if len(dL_Raw) == 0:
         dL = detector.detect(clahe.apply(left_g))
         used_clahe_L = True
@@ -235,7 +249,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
         # marker_obj_dict = buildMarkers(dodecahedron_markers)
     elif shape == "Icosahedron":
-        marker_obj_dict = buildMarkers(icosahedron_markers)
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
 
     for c in dL:  
         tagId =  int(c.tag_id)
@@ -268,7 +282,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
             print("Consistency check skipped: <2 markers detected in left frame.")
         else:
             T_cam_obj = T_cam_marker_meas_left[mids_left[0]] @ marker_obj_dict[mids_left[0]]
-            
             R_obj = T_cam_obj[:3, :3]
             T_obj = T_cam_obj[:3, 3]
             rVec_obj_left,_  =cv2.Rodrigues(R_obj)
@@ -276,19 +289,15 @@ def detection(path, shape, distance, tag=None, degrees=None):
             cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
     else:
         A, score, perB = referencePicker(mids_left, T_cam_marker_meas_left, marker_obj_dict)
-        print(A,T_cam_marker_meas_left[A]@marker_obj_dict[A])
         inliers = [A]
         outliers = []
         for B, res in perB.items():
             if res["dang"] > 12.0 or res["dt"] > 0.02:
                 outliers.append(B)
-                print("dang bro", B)
             else:
-                print("B",B)
                 inliers.append(B)
-                print(T_cam_marker_meas_left[B]@marker_obj_dict[B])
         
-        print("inliers left:", inliers, "outliers left:", outliers)
+        print("left inliers:", inliers,"\n", "left outliers:", outliers, "\n", sep="")
 
         T_list = [T_cam_marker_meas_left[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
         T_cam_obj = fuse_T(T_list)
@@ -298,7 +307,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
         rVec_obj_left,_  = cv2.Rodrigues(R_obj)
         tVec_obj_left = T_obj
         cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
-        print("Detected IDs:", tagId if tagId is not None else None)
 
         for l in range(c.corners.shape[0]):
             cv2.circle(left, center=(int(c.corners[l][0]), int(c.corners[l][1])), radius=5, color=(0, 0,250))
@@ -321,13 +329,10 @@ def detection(path, shape, distance, tag=None, degrees=None):
         rVec_markers_right, tVec_markers_right = choosePose(rightCornerPoints, imagePointRight, cameraMatrixRight, distortionCoefficientsRight)
         testrVec_markers_right = rVec_markers_right.reshape(3,1)
         R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
-        print(tagId)
         T = np.eye(4)
         T[:3,:3] = R_cam_marker
         T[:3,3]  = tVec_markers_right[:,0]
         T_cam_marker_meas_right[tagId] = T
-        
-
 
         cv2.circle(right, center=(int(d.center[0]), int(d.center[1])), radius=5, color=(0, 250,0))
         cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_markers_right, tVec_markers_right, 0.01)
@@ -353,7 +358,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             else:
                 inliers.append(B)
         
-        print("inliers:", inliers, "outliers:", outliers)
+        print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
 
         T_list = [T_cam_marker_meas_right[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
         T_cam_obj = fuse_T(T_list)
@@ -363,7 +368,6 @@ def detection(path, shape, distance, tag=None, degrees=None):
         rVec_obj_right,_  =cv2.Rodrigues(R_obj)
         tVec_obj_right = T_obj
         cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-        print("Detected IDs:", tagId if tagId is not None else None)
 
         for f in range(d.corners.shape[0]):
             cv2.circle(right, center=(int(d.corners[f][0]), int(d.corners[f][1])), radius=5, color=(0, 0,250))
@@ -380,7 +384,29 @@ def detection(path, shape, distance, tag=None, degrees=None):
             f"{degrees + "°" + ' ' if degrees else ''}" 
             f"{distance}m")
 
-    cv2.waitKey(0)
+    while True: 
+        print("Is the orientation of the object frame correct for the left image? Yes (1), No (2)\n")
+        key_left = cv2.waitKey(0) & 0xFF
+        if key_left == ord("1"):
+                counters["left_correct_objectframe"] +=1
+                print("Left orientation chosen to be correct\n")
+                break
+        elif key_left == ord("2"): 
+                print("Left orientation chosen to be incorrect\n")
+                break
+
+    while True: 
+        print("Is the orientation of the object frame correct for the right image? Yes (1), No (2)\n")
+        key_right = cv2.waitKey(0) & 0xFF
+        if key_right == ord("1"):
+                counters["right_correct_objectframe"] +=1
+                print("Right orientation chosen to be correct\n")
+                cv2.destroyAllWindows()
+                break
+        elif key_right == ord("2"): 
+                print("right orientation chosen to be correct\n")
+                break       
+
     cv2.destroyAllWindows()
 
 
@@ -420,6 +446,14 @@ k24 = 0.0000
 k25 = -0.0000
 k26 = 0.0000
 
+counters = {
+    "left_missing": 0,
+    "right_missing": 0,
+    "left_correct_objectframe": 0,
+    "right_correct_objectframe": 0,
+    "total": 0
+}
+
 distortionCoefficientsLeft = np.array([k11, k12, p11, p12, k13, k14, k15, k16])
 
 distortionCoefficientsRight = np.array([k21, k22, p21, p22, k23, k24, k25, k26])
@@ -433,8 +467,9 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
                [0, 0, 1]])
 
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)")
-shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)")
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)\n")
+shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
+
 
 if int(shapechoice) == 4:
     shape_used = shape
@@ -460,3 +495,8 @@ elif int(choice) == 2:
                         for f in currentImgPath.iterdir():
                             if f.is_file() and f.suffix.lower() == ".png":
                                 detection(f, shape_used[x], distance[l], tag[1], degrees[d])
+
+print("Markers missed left", counters["left_missing"],"/", counters["total"])
+print("Markers missed right", counters["right_missing"],"/", counters["total"])
+print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"])
+print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"])
