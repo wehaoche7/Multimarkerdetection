@@ -6,8 +6,9 @@ import numpy as np
 import csv
 print(cv2.__version__)
 
+#Change depending on test data (top normal bottom depth)
 imgpath=Path(r"C:\Users\wehao\Downloads\Python\Markers")
-
+# imgpath=Path(r"C:\Users\wehao\Downloads\Depth new markers")
 detector = Detector(
     families="tag36h11",
     nthreads=4,
@@ -17,11 +18,20 @@ detector = Detector(
     decode_sharpening=0.25
 )
 
-sizeByShape = {
-    "Square" : {12 : 0.036, 146 : 0.036, 173 : 0.036, 255 : 0.036, 206 : 0.036},
-    "Dodecahedron" : {193 : 0.019, 556 : 0.019, 386 : 0.019, 462 : 0.019, 360 : 0.019, 340 : 0.019, 284 : 0.019, 70 : 0.019, 493 : 0.019, 300 : 0.019, 183 : 0.019},
-    "Icosahedron" : {348 : 0.013, 495 : 0.013, 163 : 0.013, 392 : 0.013, 93 : 0.013, 123 : 0.013, 92 : 0.013, 290 : 0.013, 169 : 0.013, 12 : 0.013, 416 : 0.013, 394 : 0.013, 513 : 0.013, 203 : 0.013, 434 : 0.013, 380 : 0.013,
-                     45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01}
+# sizeByShape = {
+#     "Square" : {12 : 0.036, 146 : 0.036, 173 : 0.036, 255 : 0.036, 206 : 0.036},
+#     "Dodecahedron" : {193 : 0.019, 556 : 0.019, 386 : 0.019, 462 : 0.019, 360 : 0.019, 340 : 0.019, 284 : 0.019, 70 : 0.019, 493 : 0.019, 300 : 0.019, 183 : 0.019},
+#     "Icosahedron" : {348 : 0.013, 495 : 0.013, 163 : 0.013, 392 : 0.013, 93 : 0.013, 123 : 0.013, 92 : 0.013, 290 : 0.013, 169 : 0.013, 12 : 0.013, 416 : 0.013, 394 : 0.013, 513 : 0.013, 203 : 0.013, 434 : 0.013, 380 : 0.013,
+#                      45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01}
+# }
+
+# changes
+sizeByShape ={
+    "Square" : {0 : 0.08},
+    "Dodecahedron" : {0 : 0.08
+                      },
+    "Icosahedron" : {341 : 0.065, 185 : 0.065, 24 : 0.065, 226 : 0.065, 547 : 0.065, 200 : 0.5, 32 : 0.5, 69 : 0.5, 254 : 0.5, 438 : 0.5, 26 : 0.5, 511 : 0.5, 78 : 0.5}
+
 }
 
 
@@ -154,6 +164,7 @@ def choosePose(corners, imagePoints, cameraMatrix, distortionCoefficients):
 
 def getMarkerSize(markerId, shape):
     markerId = int(markerId)
+    print(shape)
     return sizeByShape.get(shape, {}).get(markerId, None)
 
 def cornerStone(markerSize):
@@ -204,7 +215,8 @@ def fuse_T(T_list):
 
 
 def detection(path, shape, distance, tag=None, degrees=None):
-    
+
+
     T_cam_marker_meas_right = {}
     T_cam_marker_meas_left = {}
     img=cv2.imread(path)
@@ -248,8 +260,11 @@ def detection(path, shape, distance, tag=None, degrees=None):
     elif shape == "Dodecahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
         # marker_obj_dict = buildMarkers(dodecahedron_markers)
+    # elif shape == "Icosahedron":
+    #     marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Icosahedron":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
+    
 
     for c in dL:  
         tagId =  int(c.tag_id)
@@ -273,20 +288,21 @@ def detection(path, shape, distance, tag=None, degrees=None):
         T[:3,:3] = R_cam_marker
         T[:3,3]  = tVec_markers_left[:,0]
         T_cam_marker_meas_left[tagId] = T
-        
+        print(tVec_markers_left, "distance", np.linalg.norm(tVec_markers_left))
         cv2.circle(left, center=(int(c.center[0]), int(c.center[1])), radius=5, color=(0, 250,0))
-        cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_markers_left, tVec_markers_left, 0.01)
+        cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_markers_left, tVec_markers_left, 0.1)
     mids_left = list(T_cam_marker_meas_left.keys())
     if len(mids_left) < 2:
         if len(mids_left) == 0:
             print("Consistency check skipped: <2 markers detected in left frame.")
-        else:
-            T_cam_obj = T_cam_marker_meas_left[mids_left[0]] @ marker_obj_dict[mids_left[0]]
-            R_obj = T_cam_obj[:3, :3]
-            T_obj = T_cam_obj[:3, 3]
-            rVec_obj_left,_  =cv2.Rodrigues(R_obj)
-            tVec_obj_left = T_obj
-            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+        # else:
+            # T_cam_obj = T_cam_marker_meas_left[mids_left[0]] @ marker_obj_dict[mids_left[0]]
+            # print(T_cam_obj)
+            # R_obj = T_cam_obj[:3, :3]
+            # T_obj = T_cam_obj[:3, 3]
+            # rVec_obj_left,_  =cv2.Rodrigues(R_obj)
+            # tVec_obj_left = T_obj
+            # cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
     else:
         A, score, perB = referencePicker(mids_left, T_cam_marker_meas_left, marker_obj_dict)
         inliers = [A]
@@ -301,6 +317,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
 
         T_list = [T_cam_marker_meas_left[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
         T_cam_obj = fuse_T(T_list)
+        print(T_cam_obj)
 
         R_obj= T_cam_obj[:3, :3]
         T_obj = T_cam_obj[:3, 3]
@@ -333,20 +350,21 @@ def detection(path, shape, distance, tag=None, degrees=None):
         T[:3,:3] = R_cam_marker
         T[:3,3]  = tVec_markers_right[:,0]
         T_cam_marker_meas_right[tagId] = T
-
+        print(tVec_markers_right, "distance", np.linalg.norm(tVec_markers_right))
         cv2.circle(right, center=(int(d.center[0]), int(d.center[1])), radius=5, color=(0, 250,0))
-        cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_markers_right, tVec_markers_right, 0.01)
+        cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_markers_right, tVec_markers_right, 0.1)
     mids_right = list(T_cam_marker_meas_right.keys())
     if len(mids_right) < 2:
         if len(mids_right) == 0:
             print("Consistency check skipped: <2 markers detected in left frame.")
-        else:
-            T_cam_obj = T_cam_marker_meas_right[mids_right[0]] @ marker_obj_dict[mids_right[0]]
-            R_obj = T_cam_obj[:3, :3]
-            T_obj = T_cam_obj[:3, 3]
-            rVec_obj_right,_  =cv2.Rodrigues(R_obj)
-            tVec_obj_right = T_obj
-            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
+        # else:
+        #     T_cam_obj = T_cam_marker_meas_right[mids_right[0]] @ marker_obj_dict[mids_right[0]]
+        #     print(T_cam_obj)
+        #     R_obj = T_cam_obj[:3, :3]
+        #     T_obj = T_cam_obj[:3, 3]
+        #     rVec_obj_right,_  =cv2.Rodrigues(R_obj)
+        #     tVec_obj_right = T_obj
+        #     cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
     else:
         A, score, perB = referencePicker(mids_right, T_cam_marker_meas_right, marker_obj_dict)
 
@@ -361,8 +379,9 @@ def detection(path, shape, distance, tag=None, degrees=None):
         print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
 
         T_list = [T_cam_marker_meas_right[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
+        
         T_cam_obj = fuse_T(T_list)
-
+        print(T_cam_obj)
         R_obj= T_cam_obj[:3, :3]
         T_obj = T_cam_obj[:3, 3]
         rVec_obj_right,_  =cv2.Rodrigues(R_obj)
@@ -404,17 +423,27 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 cv2.destroyAllWindows()
                 break
         elif key_right == ord("2"): 
-                print("right orientation chosen to be correct\n")
+                print("right orientation chosen to be incorrect\n")
                 break       
 
     cv2.destroyAllWindows()
 
-
+#Change depending on test data (top normal bottom depth)
 shape = ["Square", "Dodecahedron", "Icosahedron"]
 distance = ["0.25", "0.5", "0.75", "1"]
+degrees = ["10", "20", "30", "40"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
+
+# tagsize = ["small", "large"]
+# distance = ["1.2", "1.5", "2"]
+# # degrees = ["10", "20", "30", "40"]
+# shape = ["Square", "Dodecahedron", "Icosahedron"]
+# degrees = ["10", "20", "30", "40", "45"]
+# tag = ["Aruco", "Apriltag"]
+
+# folder = ["First day", "Second day", "Double", ""]
 
 EPS = 1E-6
 
@@ -446,12 +475,18 @@ k24 = 0.0000
 k25 = -0.0000
 k26 = 0.0000
 
+i = 0
+
 counters = {
     "left_missing": 0,
     "right_missing": 0,
     "left_correct_objectframe": 0,
     "right_correct_objectframe": 0,
-    "total": 0
+    "total": 0,
+    "total 0.25m":0,
+    "total 0.5m":0,
+    "total 0.75m":0,
+    "total 1m":0
 }
 
 distortionCoefficientsLeft = np.array([k11, k12, p11, p12, k13, k14, k15, k16])
@@ -467,8 +502,38 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
                [0, 0, 1]])
 
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)\n")
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3), ""(4)\n")
 shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
+sizechoice = input("I require size choice: Small(1), Large(2)")
+
+# if int(shapechoice) == 4:
+#     shape_used = shape
+# else:
+#     shape_used = [shape[int(shapechoice)-1]]
+# if int(choice) == 1:    
+#         newImgPath = imgpath / folder[int(choice) - 1]
+#         for x in range(len(shape_used)):
+#              for l in range(len(distance)):
+#                 currentImgPath = newImgPath / (shape_used[x] + " " + distance[l] + "m")
+#                 for f in currentImgPath.iterdir():
+#                     if f.is_file() and f.suffix.lower() == ".png":
+#                         i+=1
+#                         print("Current iteration", i)
+#                         detection(f, shape_used[x], distance[l],)
+            
+# elif int(choice) == 2:
+#         distance = distance [0:2]
+#         newImgPath = imgpath / folder[int(choice) - 1]
+#         for x in range(len(shape_used)):
+#                 print(shape_used)
+#                 for l in range(len(distance)):
+#                     for d in range(len(degrees)):
+#                         currentImgPath = newImgPath / (tag[1] + " " + shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
+#                         for f in currentImgPath.iterdir():
+#                             if f.is_file() and f.suffix.lower() == ".png":
+#                                 i+=1
+#                                 print("Current iteration", i)
+#                                 detection(f, shape_used[x], distance[l], tag[1], degrees[d])
 
 
 if int(shapechoice) == 4:
@@ -482,6 +547,8 @@ if int(choice) == 1:
                 currentImgPath = newImgPath / (shape_used[x] + " " + distance[l] + "m")
                 for f in currentImgPath.iterdir():
                     if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
                         detection(f, shape_used[x], distance[l],)
             
 elif int(choice) == 2:
@@ -491,12 +558,35 @@ elif int(choice) == 2:
                 print(shape_used)
                 for l in range(len(distance)):
                     for d in range(len(degrees)):
-                        currentImgPath = newImgPath / (tag[1] + " " +shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
+                        currentImgPath = newImgPath / (tag[1] + " " + shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
                         for f in currentImgPath.iterdir():
                             if f.is_file() and f.suffix.lower() == ".png":
+                                i+=1
+                                print("Current iteration", i)
                                 detection(f, shape_used[x], distance[l], tag[1], degrees[d])
 
-print("Markers missed left", counters["left_missing"],"/", counters["total"])
+if int(choice) == 4:    
+        newImgPath = imgpath
+        for x in range(len(shape_used)):
+            for l in range(len(distance)):
+                currentImgPath = newImgPath / (tag[1] + " " + tagsize[int(sizechoice)-1] +" " + distance[l] + " " + "meters")
+                for f in currentImgPath.iterdir():
+                    if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
+                        detection(f, shape_used[x], distance[l])                 
+
+if int(choice) == 5:    
+        newImgPath = imgpath / "Trial"
+        for x in range(len(shape_used)):
+            for f in newImgPath.iterdir():
+                    if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
+                        detection(f, shape_used[x], 1.5)                     
+                            
+
+print("Markers missed left", counters["left_missing"],"/", counters["total"],)
 print("Markers missed right", counters["right_missing"],"/", counters["total"])
-print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"])
-print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"])
+print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"]-counters["left_missing"])
+print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"]-counters["right_missing"])

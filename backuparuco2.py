@@ -9,13 +9,19 @@ print(cv2.__version__)
 size = None
 
 # Marker size per shape (note Icosahedron has two different marker sizes)
-sizeByShape = {
-    "Square" : {134 : 0.036, 101 : 0.036, 99 : 0.036, 103 : 0.036, 183 : 0.036},
-    "Dodecahedron" : {147 : 0.019, 186 : 0.019, 184 : 0.019, 133 : 0.019, 166 : 0.019, 86 : 0.019, 57 : 0.019, 174 : 0.019, 104 : 0.019, 3 : 0.019, 5 : 0.019},
-    "Icosahedron" : {44 : 0.013, 47 : 0.013, 61 : 0.013, 209 : 0.013, 187 : 0.013, 132 : 0.013, 246 : 0.013, 227 : 0.013, 28 : 0.013, 144 : 0.013, 111 : 0.013, 232 : 0.013, 60 : 0.013, 182 : 0.013, 135 : 0.013, 12 : 0.013,
-                     77 : 0.013, 237 : 0.013, 31 : 0.013, 37 : 0.013, 17 : 0.01, 211 : 0.01, 224 : 0.01, 202 : 0.01, 30 : 0.01, 15 : 0.01, 85 : 0.01, 55 : 0.01, 147 : 0.01, 225 : 0.01, 108 : 0.01, 116 : 0.01}
-}
+# sizeByShape = {
+#     "Square" : {134 : 0.036, 101 : 0.036, 99 : 0.036, 103 : 0.036, 183 : 0.036},
+#     "Dodecahedron" : {147 : 0.019, 186 : 0.019, 184 : 0.019, 133 : 0.019, 166 : 0.019, 86 : 0.019, 57 : 0.019, 174 : 0.019, 104 : 0.019, 3 : 0.019, 5 : 0.019},
+#     "Icosahedron" : {44 : 0.013, 47 : 0.013, 61 : 0.013, 209 : 0.013, 187 : 0.013, 132 : 0.013, 246 : 0.013, 227 : 0.013, 28 : 0.013, 144 : 0.013, 111 : 0.013, 232 : 0.013, 60 : 0.013, 182 : 0.013, 135 : 0.013, 12 : 0.013,
+#                      77 : 0.013, 237 : 0.013, 31 : 0.013, 37 : 0.013, 17 : 0.01, 211 : 0.01, 224 : 0.01, 202 : 0.01, 30 : 0.01, 15 : 0.01, 85 : 0.01, 55 : 0.01, 147 : 0.01, 225 : 0.01, 108 : 0.01, 116 : 0.01}
+# }
 # Archaic position data, is still required by icosahedron as i didn't manage to make the new data files for dodecahedrons yet
+
+sizeByShape ={
+    "Square" : {5: 0.08},
+    "Dodecahedron" : {166 : 0.10},
+    "Icosahedron" : {166 : 0.10}
+}
 
 icosahedron_markers = {
 
@@ -167,7 +173,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
     
     elif shape == "Icosahedron":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Aruco_fileCoM_semicolon - kopie.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
     
     if ids1 is not None:
         cv2.aruco.drawDetectedMarkers(left, corners1, ids1)
@@ -181,51 +187,55 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 continue
 
             rVecs_markers_left, tVecs_markers_left, _ = aruco.estimatePoseSingleMarkers(corner1, size, cameraMatrixLeft, distortionCoefficientsLeft)
-            testrVec_markers_left = rVecs_markers_left.reshape(3,1)
-            R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
+            print(tVecs_markers_left, "distance", np.linalg.norm(tVecs_markers_left))
 
-            # the actual T matrices used for calculation
-            T_left = np.eye(4)
-            T_left[:3,:3] = R_cam_marker
-            T_left[:3,3] = tVecs_markers_left.reshape(3)
-            T_cam_marker_meas_left[mid1] = T_left
-            mids = list(T_cam_marker_meas_left.keys())
-            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.01)
+            # testrVec_markers_left = rVecs_markers_left.reshape(3,1)
+            # R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
+
+            # # the actual T matrices used for calculation
+            # T_left = np.eye(4)
+            # T_left[:3,:3] = R_cam_marker
+            # T_left[:3,3] = tVecs_markers_left.reshape(3)
+            # T_cam_marker_meas_left[mid1] = T_left
+            # mids = list(T_cam_marker_meas_left.keys())
+            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVecs_markers_left, tVecs_markers_left, 0.1)
         #The code currently focuses on single markers since multi marker detection is pointless if the individual markers aren't correct, also the right side of the camera is commented out for 
-        if len(mids) < 2: 
+        # if len(mids) < 2: 
 
-            print("Consistency check skipped: <2 markers detected in left frame.")
-            T_cam_obj = T_cam_marker_meas_left[mids[0]] @ marker_obj_dict[mids[0]]
-            R_obj_left = T_cam_obj[:3, :3]
-            tVec_obj_left = T_cam_obj[:3, 3]
-            rVec_obj_left,_  = cv2.Rodrigues(R_obj_left)
-            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+        #     print("Consistency check skipped: <2 markers detected in left frame.")
+        #     T_cam_obj = T_cam_marker_meas_left[mids[0]] @ marker_obj_dict[mids[0]]
+        #     print(T_cam_obj)
+        #     R_obj_left = T_cam_obj[:3, :3]
+        #     tVec_obj_left = T_cam_obj[:3, 3]
+        #     rVec_obj_left,_  = cv2.Rodrigues(R_obj_left)
+        #     cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
             
-        else:
-            A, score, perB = referencePicker(mids, T_cam_marker_meas_left, marker_obj_dict)
+        # else:
+        #     A, score, perB = referencePicker(mids, T_cam_marker_meas_left, marker_obj_dict)
 
-            inliers = [A]
-            outliers = []
-            yaw_dict = {A:0}
-            for B, res in perB.items():
-                if res["dang"] > 12.0 or res["dt"] > 0.02:
-                    outliers.append(B)
-                else:
-                    inliers.append(B)
-                    yaw_dict[B] = res["yaw"]
+        #     inliers = [A]
+        #     outliers = []
+        #     yaw_dict = {A:0}
+        #     for B, res in perB.items():
+        #         if res["dang"] > 12.0 or res["dt"] > 0.02:
+        #             outliers.append(B)
+        #         else:
+        #             inliers.append(B)
+        #             yaw_dict[B] = res["yaw"]
             
-            print("left inliers:", inliers,"\n", "left outliers:", outliers, "\n", sep="")
-            T_list = []
-            for mid in inliers:
-                yaw = yaw_dict.get(mid, 0)
-                T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
-                T_list.append(T_cam_marker_meas_left[mid]@T_marker_obj_correct)
-            T_cam_obj = fuse_T(T_list)
-            R_obj= T_cam_obj[:3, :3]
-            T_obj = T_cam_obj[:3, 3]
-            rVec_obj_left,_  =cv2.Rodrigues(R_obj)
-            tVec_obj_left = T_obj
-            cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
+        #     print("left inliers:", inliers,"\n", "left outliers:", outliers, "\n", sep="")
+        #     T_list = []
+        #     for mid in inliers:
+        #         yaw = yaw_dict.get(mid, 0)
+        #         T_marker_obj_correct = apply_marker_yaw_to_T_marker_obj(marker_obj_dict[mid], yaw)
+        #         T_list.append(T_cam_marker_meas_left[mid]@T_marker_obj_correct)
+        #     T_cam_obj = fuse_T(T_list)
+        #     print(T_cam_obj)
+        #     R_obj= T_cam_obj[:3, :3]
+        #     T_obj = T_cam_obj[:3, 3]
+        #     rVec_obj_left,_  =cv2.Rodrigues(R_obj)
+        #     tVec_obj_left = T_obj
+        #     cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
 
         
     
@@ -240,48 +250,50 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 print("BAD size:", size, "for id", int(mid2), "shape", shape)
                 continue
             rVecs_markers_right, tVecs_markers_right, _ = aruco.estimatePoseSingleMarkers(corner2, size, cameraMatrixRight, distortionCoefficientsRight)
-            testrVec_markers_right = rVecs_markers_right.reshape(3,1)
-            R_right_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
+            print(tVecs_markers_right, "distance", np.linalg.norm(tVecs_markers_right))
+            # testrVec_markers_right = rVecs_markers_right.reshape(3,1)
+            # R_right_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
 
-            T_right = np.eye(4)
-            T_right[:3,:3] = R_right_cam_marker
-            T_right[:3,3]  = tVecs_markers_right.reshape(3)
-            T_cam_marker_meas_right[mid2] = T_right
-            mids = list(T_cam_marker_meas_right.keys())
-            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVecs_markers_right, tVecs_markers_right, 0.01)
+            # T_right = np.eye(4)
+            # T_right[:3,:3] = R_right_cam_marker
+            # T_right[:3,3]  = tVecs_markers_right.reshape(3)
+            # T_cam_marker_meas_right[mid2] = T_right
+            # mids = list(T_cam_marker_meas_right.keys())
+            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVecs_markers_right, tVecs_markers_right, 0.1)
 
-        if len(mids) < 2:
-            print("Consistency check skipped: <2 markers detected in right frame.")
-            T_cam_obj = T_cam_marker_meas_right[mids[0]] @ marker_obj_dict[mids[0]]
-            R_obj_right = T_cam_obj[:3, :3]
-            tVec_obj_right = T_cam_obj[:3, 3]
-            rVec_obj_right,_  = cv2.Rodrigues(R_obj_right)
-            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-        else:
-            A, score, perB = referencePicker(mids, T_cam_marker_meas_right, marker_obj_dict)
+        # if len(mids) < 2:
+        #     print("Consistency check skipped: <2 markers detected in right frame.")
+        #     T_cam_obj = T_cam_marker_meas_right[mids[0]] @ marker_obj_dict[mids[0]]
+        #     print(T_cam_obj)
+        #     R_obj_right = T_cam_obj[:3, :3]
+        #     tVec_obj_right = T_cam_obj[:3, 3]
+        #     rVec_obj_right,_  = cv2.Rodrigues(R_obj_right)
+        #     cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
+        # else:
+        #     A, score, perB = referencePicker(mids, T_cam_marker_meas_right, marker_obj_dict)
 
-            inliers = [A]
-            outliers = []
-            yaw_dict = {A:0}
-            for B, res in perB.items():
-                if res["dang"] > 12.0 or res["dt"] > 0.02:
-                    outliers.append(B)
-                else:
-                    inliers.append(B)
-                    yaw_dict[B] = res["yaw"]
+        #     inliers = [A]
+        #     outliers = []
+        #     yaw_dict = {A:0}
+        #     for B, res in perB.items():
+        #         if res["dang"] > 12.0 or res["dt"] > 0.02:
+        #             outliers.append(B)
+        #         else:
+        #             inliers.append(B)
+        #             yaw_dict[B] = res["yaw"]
             
-            print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
-            T_list = []
-            for mid in inliers:
-                yaw = yaw_dict.get(mid, 0)
-                T_list.append(T_cam_marker_meas_right[mid]@marker_obj_dict[mid])
-            T_cam_obj = fuse_T(T_list)
-
-            R_multipleMarker = T_cam_obj[:3, :3]
-            T_multipleMarker = T_cam_obj[:3, 3]
-            rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
-            tVec_obj_right = T_multipleMarker
-            cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
+        #     print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
+        #     T_list = []
+        #     for mid in inliers:
+        #         yaw = yaw_dict.get(mid, 0)
+        #         T_list.append(T_cam_marker_meas_right[mid]@marker_obj_dict[mid])
+        #     T_cam_obj = fuse_T(T_list)
+        #     print(T_cam_obj)
+        #     R_multipleMarker = T_cam_obj[:3, :3]
+        #     T_multipleMarker = T_cam_obj[:3, 3]
+        #     rVec_obj_right,_  =cv2.Rodrigues(R_multipleMarker)
+        #     tVec_obj_right = T_multipleMarker
+        #     cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
 
     print(f"Currently inspecting: "
           f"{tag + ' ' if tag else ' '}"
@@ -315,7 +327,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 cv2.destroyAllWindows()
                 break
         elif key_right == ord("2"): 
-                print("right orientation chosen to be correct\n")
+                print("right orientation chosen to be incorrect\n")
                 break       
 
         
@@ -381,7 +393,7 @@ k23 = 0.0050
 k24 = 0.0000
 k25 = -0.0000
 k26 = 0.0000
-
+i=0
 EPS = 1e-6
 
 counters = {
@@ -407,17 +419,31 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
 aruco_dict=aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 parameters=aruco.DetectorParameters()
 detector=aruco.ArucoDetector(aruco_dict,parameters)
-
+#Change depending on test data (top normal bottom depth)
 imgpath=Path(r"C:\Users\wehao\Downloads\Python\Markers")
+# imgpath=Path(r"C:\Users\wehao\Downloads\Depth new markers")
 
+
+#Change depending on test data (top normal bottom depth)
 shape = ["Square", "Dodecahedron", "Icosahedron"]
 distance = ["0.25", "0.5", "0.75", "1"]
+degrees = ["10", "20", "30", "40"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)\n")
+# tagsize = ["small", "large"]
+# distance = ["1.2", "1.5", "2"]
+# # degrees = ["10", "20", "30", "40"]
+# shape = ["Square", "Dodecahedron", "Icosahedron"]
+# degrees = ["10", "20", "30", "40", "45"]
+# tag = ["Aruco", "Apriltag"]
+
+folder = ["First day", "Second day", "Double", ""]
+
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3), ""(4)\n")
 shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
+sizechoice = input("I require size choice: Small(1), Large(2)")
 
 if int(shapechoice) == 4:
     shape_used = shape
@@ -430,7 +456,10 @@ if int(choice) == 1:
                 currentImgPath = newImgPath / (shape_used[x] + " " + distance[l] + "m")
                 for f in currentImgPath.iterdir():
                     if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
                         detection(f, shape_used[x], distance[l],)
+                    
             
 elif int(choice) == 2:
         distance = distance [0:2]
@@ -442,11 +471,26 @@ elif int(choice) == 2:
                         currentImgPath = newImgPath / (tag[0] + " " +shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
                         for f in currentImgPath.iterdir():
                             if f.is_file() and f.suffix.lower() == ".png":
+                                i+=1
+                                print("Current iteration", i)
                                 detection(f, shape_used[x], distance[l], tag[0], degrees[d])
+                            
+if int(choice) == 4:    
+        newImgPath = imgpath
+        for x in range(len(shape_used)):
+            for l in range(len(distance)):
+                currentImgPath = newImgPath / (tag[0] + " " + tagsize[int(sizechoice)-1] +" " + distance[l] + " " + "meters")
+                for f in currentImgPath.iterdir():
+                    if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
+                        detection(f, shape_used[x], distance[l])            
+                            
+
 
 
 print("Markers missed left", counters["left_missing"],"/", counters["total"])
 print("Markers missed right", counters["right_missing"],"/", counters["total"])
-print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"])
-print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"])
+print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"]-counters["left_missing"])
+print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"]-counters["right_missing"])
 
