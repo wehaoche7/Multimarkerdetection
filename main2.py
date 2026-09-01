@@ -21,53 +21,12 @@ sizeByShape = {
     "Square" : {12 : 0.036, 146 : 0.036, 173 : 0.036, 255 : 0.036, 206 : 0.036},
     "Dodecahedron" : {193 : 0.019, 556 : 0.019, 386 : 0.019, 462 : 0.019, 360 : 0.019, 340 : 0.019, 284 : 0.019, 70 : 0.019, 493 : 0.019, 300 : 0.019, 183 : 0.019},
     "Icosahedron" : {348 : 0.013, 495 : 0.013, 163 : 0.013, 392 : 0.013, 93 : 0.013, 123 : 0.013, 92 : 0.013, 290 : 0.013, 169 : 0.013, 12 : 0.013, 416 : 0.013, 394 : 0.013, 513 : 0.013, 203 : 0.013, 434 : 0.013, 380 : 0.013,
-                     45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01}
+                     45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01},
+    "Winged" : {341 : 0.065, 185 : 0.065, 24 : 0.065, 226 : 0.065, 547 : 0.065, 78 : 0.05, 511 : 0.05, 26 : 0.05, 438 : 0.05, 254 : 0.05, 69 : 0.05, 32 : 0.05, 200 : 0.05}
 }
 
 
-icosahedron_markers = {
 
-    # bottom row
-    324: {"t": (-0.00402, -0.01981,  0.02646), "r_deg": (179.99,  48.19, 142.63)},
-    380: {"t": ( 0.01760, -0.00994,  0.02646), "r_deg": (108.00,  82.68, 142.63)},
-    45:  {"t": ( 0.01490,  0.01367,  0.02646), "r_deg": ( 36.00, 138.19, 142.62)},
-    33:  {"t": (-0.00840,  0.01839,  0.02646), "r_deg": ( 36.00, 138.18, 142.61)},
-    576: {"t": (-0.02009,  0.00230,  0.02646), "r_deg": (108.00,  82.68, 142.61)},
-
-    # second row
-    394: {"t": (-0.00650,  0.03206,  0.00624), "r_deg": (179.99,  90.00, 100.81)},
-    337: {"t": ( 0.01270,  0.02781,  0.01529), "r_deg": (144.00,  79.19, 116.57)},
-    290: {"t": ( 0.02848,  0.01609,  0.00624), "r_deg": (107.99,  97.31, 100.82)},
-    222: {"t": ( 0.03038,  0.00348,  0.01529), "r_deg": ( 72.00, 107.67, 116.57)},
-    392: {"t": ( 0.02410,  0.02212,  0.00624), "r_deg": ( 36.00, 109.49, 100.81)},
-    586: {"t": ( 0.00607,  0.02997,  0.01529), "r_deg": (  0.01, 127.37, 116.55)},
-    163: {"t": (-0.01359,  0.02976,  0.00624), "r_deg": ( 36.00, 109.46, 100.80)},
-    321: {"t": ( 0.02662,  0.01504,  0.01529), "r_deg": ( 72.00, 107.66, 116.55)},
-    203: {"t": (-0.03250, -0.00373,  0.00624), "r_deg": (108.00,  97.31, 100.80)},
-    510: {"t": (-0.02253, -0.02067,  0.01529), "r_deg": (144.00,  79.19, 116.56)},
-
-    # third row
-    339: {"t": (-0.00608, -0.02996, -0.01529), "r_deg": (179.99, 127.38,  63.44)},
-    169: {"t": ( 0.01359, -0.02975, -0.00625), "r_deg": (144.00, 109.47,  79.19)},
-    18:  {"t": ( 0.02662, -0.01503, -0.01529), "r_deg": (107.99, 107.67,  63.44)},
-    123: {"t": ( 0.03250,  0.00373, -0.00625), "r_deg": ( 71.99,  97.32,  79.19)},
-    582: {"t": ( 0.02252,  0.02068, -0.01528), "r_deg": ( 36.01,  79.19,  63.44)},
-    495: {"t": ( 0.00650,  0.03206, -0.00625), "r_deg": (  0.01,  89.99,  79.17)},
-    349: {"t": (-0.01270,  0.02781, -0.01529), "r_deg": ( 36.00,  79.18,  63.42)},
-    434: {"t": (-0.02848,  0.01610, -0.00625), "r_deg": ( 71.74,  97.27,  79.19)},
-    536: {"t": (-0.03038, -0.00348, -0.01528), "r_deg": (108.03, 107.68,  63.44)},
-    416: {"t": (-0.02410, -0.02212, -0.00625), "r_deg": (143.99, 109.47,  79.18)},
-
-    # fourth row
-    92:  {"t": (-0.00840,  0.01839, -0.02647), "r_deg": (143.99, 138.19,  37.38)},
-    93:  {"t": ( 0.02008,  0.00231, -0.02646), "r_deg": ( 72.00,  82.68,  37.38)},
-    348: {"t": ( 0.00401,  0.01982, -0.02646), "r_deg": (  0.01,  48.19,  37.38)},
-    513: {"t": (-0.01761,  0.00995, -0.02645), "r_deg": ( 72.01,  82.69,  37.38)},
-    12:  {"t": (-0.01490, -0.01367, -0.02646), "r_deg": (144.02, 138.20,  37.38)},
-
-    # top
-    293: {"t": (-0.00001,  0.00001, -0.03418), "r_deg": (0.00, 0.00, 0.00)},
-}
 
 def Rz(rad):
     c, s = np.cos(rad), np.sin(rad)
@@ -250,6 +209,9 @@ def detection(path, shape, distance, tag=None, degrees=None):
         # marker_obj_dict = buildMarkers(dodecahedron_markers)
     elif shape == "Icosahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
+    elif shape == "Winged":
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
+
 
     for c in dL:  
         tagId =  int(c.tag_id)
@@ -344,7 +306,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
             T_cam_obj = T_cam_marker_meas_right[mids_right[0]] @ marker_obj_dict[mids_right[0]]
             R_obj = T_cam_obj[:3, :3]
             T_obj = T_cam_obj[:3, 3]
-            rVec_obj_right,_  =cv2.Rodrigues(R_obj)
+            rVec_obj_right,_ = cv2.Rodrigues(R_obj)
             tVec_obj_right = T_obj
             cv2.drawFrameAxes(right, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
     else:
@@ -404,7 +366,7 @@ def detection(path, shape, distance, tag=None, degrees=None):
                 cv2.destroyAllWindows()
                 break
         elif key_right == ord("2"): 
-                print("right orientation chosen to be correct\n")
+                print("right orientation chosen to be incorrect\n")
                 break       
 
     cv2.destroyAllWindows()
@@ -416,6 +378,7 @@ degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
 
+i = 0
 EPS = 1E-6
 
 fx1 = 772.2
@@ -467,7 +430,7 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
                [0, 0, 1]])
 
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3)\n")
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2)\n")
 shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
 
 
@@ -482,6 +445,8 @@ if int(choice) == 1:
                 currentImgPath = newImgPath / (shape_used[x] + " " + distance[l] + "m")
                 for f in currentImgPath.iterdir():
                     if f.is_file() and f.suffix.lower() == ".png":
+                        i+=1
+                        print("Current iteration", i)
                         detection(f, shape_used[x], distance[l],)
             
 elif int(choice) == 2:
@@ -491,12 +456,14 @@ elif int(choice) == 2:
                 print(shape_used)
                 for l in range(len(distance)):
                     for d in range(len(degrees)):
-                        currentImgPath = newImgPath / (tag[1] + " " +shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
+                        currentImgPath = newImgPath / (tag[1] + " " + shape_used[x] + " " + degrees[d] + "deg " + distance[l] + "m")
                         for f in currentImgPath.iterdir():
                             if f.is_file() and f.suffix.lower() == ".png":
+                                i+=1
+                                print("Current iteration", i)
                                 detection(f, shape_used[x], distance[l], tag[1], degrees[d])
 
 print("Markers missed left", counters["left_missing"],"/", counters["total"])
 print("Markers missed right", counters["right_missing"],"/", counters["total"])
-print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"])
-print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"])
+print("Orientation left object frame correctness", counters["left_correct_objectframe"],"/", counters["total"]-counters["left_missing"])
+print("Orientation right object frame correctness", counters["right_correct_objectframe"],"/", counters["total"]-counters["right_missing"])
