@@ -188,9 +188,6 @@ def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, 
     cv2.drawFrameAxes(side, cameraMatrix, distortionCoefficients, rVec_markers, tVec_markers, 0.01)
 
 def posePicker(mids_obj, T_cam_tracked_obj, side, cameraMatrix, distortionCoefficients, marker_dictionary, side_name):
-    # filteredMid = [mid for mid in mids_obj 
-    #                if mid not in sizeByShape["BasePlate"]]
-    # print(filteredMid, "potato", mids_obj)
     if len(mids_obj) < 2:
         if len(mids_obj) == 0:
             print("Consistency check skipped: <2 markers detected in left frame.")
@@ -215,7 +212,7 @@ def posePicker(mids_obj, T_cam_tracked_obj, side, cameraMatrix, distortionCoeffi
         
         print(side_name, " inliers:", inliers,"\n", side_name, " outliers:", outliers, "\n", sep="")
 
-        # T_list = [T_cam_marker_meas[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
+
         T_list = [
     T_cam_tracked_obj[mid] @ marker_dictionary[mid]
     for mid in inliers
@@ -234,11 +231,16 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
     
     T_cam_marker_meas_right = {}
     T_cam_marker_meas_left = {}
+    T_cam_base_right = {}
+    mids_base_right = []
+    mids_obj_right = []
     T_cam_base_left = {}
     mids_base_left = []
     mids_obj_left = []
     Tvec_base_left = None
     Tvec_base_obj_left = None
+    Tvec_base_right = None
+    Tvec_base_obj_right = None
     img=cv2.imread(path)
     h,w = img.shape[:2]
     left_img = img[:,:w//2]
@@ -275,40 +277,15 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
         used_clahe_R = True
     
     if shape == "Square":
-        # marker_obj_dict = buildMarkers(square_markers)
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Dodecahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
-        # marker_obj_dict = buildMarkers(dodecahedron_markers)
     elif shape == "Icosahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Winged":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_test_fileCoM_semicolon_rezero.csv", obj_name="CoM")
     base_plate_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\baseplate(Correct orientation).coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
     for c in dL:  
-        # tagId =  int(c.tag_id)
-        # leftSize = getMarkerSize(tagId, shape)
-        # if leftSize is None:
-        #     print("not in working order")
-        #     continue
-        # leftCornerPoints = cornerStone(float(leftSize))
-        # leftCornerPoints = leftCornerPoints.reshape(4, 3).astype(np.float32)
-        # imagePointLeft = c.corners.reshape(4,2).astype(np.float32)
-        # for i, (x,y) in enumerate(c.corners):
-        #     cv2.putText(left, str(i), (int(x), int(y)),
-        #     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-        # cv2.putText(left, f"id={str(tagId)}" , (int(c.center[0])+25, int(c.center[1])),
-        # cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-        # rVec_markers_left, tVec_markers_left = choosePose(leftCornerPoints, imagePointLeft, cameraMatrixLeft, distortionCoefficientsLeft)
-        # testrVec_markers_left = rVec_markers_left.reshape(3,1)
-        # R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_left)
-        # T = np.eye(4)
-        # T[:3,:3] = R_cam_marker
-        # T[:3,3]  = tVec_markers_left[:,0]
-        # T_cam_marker_meas_left[tagId] = T
-        
-        # cv2.circle(left, center=(int(c.center[0]), int(c.center[1])), radius=5, color=(0, 250,0))
-        # cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_markers_left, tVec_markers_left, 0.01)
         for l in range(c.corners.shape[0]):
             cv2.circle(left_img, center=(int(c.corners[l][0]), int(c.corners[l][1])), radius=5, color=(0, 0,250))
 
@@ -321,49 +298,7 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
         if c.tag_id in sizeByShape[shape]:
             mids_obj_left.append(c.tag_id)
             markerPose(c.tag_id, shape, c.corners, c.center, left_img, cameraMatrixLeft, distortionCoefficientsLeft, T_cam_marker_meas_left)
-        
-        
-        
-        # markerPose(c.tag_id, shape, c.corners, c.center, left, cameraMatrixLeft, distortionCoefficientsLeft, T_cam_marker_meas_left)
-    # mids_base_left = [
-    #     key for key in T_cam_marker_meas_left.keys()
-    #     if key in sizeByShape["BasePlate"]
-    # ]    
 
-
-
-
-    # mids_left = list(T_cam_marker_meas_left.keys())
-    # if len(mids_obj_left) < 2:
-    #     if len(mids_obj_left) == 0:
-    #         print("Consistency check skipped: <2 markers detected in left frame.")
-    #     else:
-    #         T_cam_obj = T_cam_marker_meas_left[mids_obj_left[0]] @ marker_obj_dict[mids_obj_left[0]]
-    #         R_obj = T_cam_obj[:3, :3]
-    #         T_obj = T_cam_obj[:3, 3]
-    #         rVec_obj_left,_  =cv2.Rodrigues(R_obj)
-    #         tVec_obj_left = T_obj
-    #         cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
-    # else:
-    #     A, score, perB = referencePicker(mids_obj_left, T_cam_marker_meas_left, marker_obj_dict)
-    #     inliers = [A]
-    #     outliers = []
-    #     for B, res in perB.items():
-    #         if res["dang"] > 12.0 or res["dt"] > 0.02:
-    #             outliers.append(B)
-    #         else:
-    #             inliers.append(B)
-        
-    #     print("left inliers:", inliers,"\n", "left outliers:", outliers, "\n", sep="")
-
-    #     T_list = [T_cam_marker_meas_left[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
-    #     T_cam_obj = fuse_T(T_list)
-
-    #     R_obj= T_cam_obj[:3, :3]
-    #     T_obj = T_cam_obj[:3, 3]
-    #     rVec_obj_left,_  = cv2.Rodrigues(R_obj)
-    #     tVec_obj_left = T_obj
-    #     cv2.drawFrameAxes(left, cameraMatrixLeft, distortionCoefficientsLeft, rVec_obj_left, tVec_obj_left, 0.01)
     Tvec_obj_left = posePicker(mids_obj_left, T_cam_marker_meas_left, left_img, cameraMatrixLeft, distortionCoefficientsLeft, marker_obj_dict, "left")
     if mids_base_left:
         Tvec_base_left = posePicker(mids_base_left, T_cam_base_left, left_img, cameraMatrixLeft, distortionCoefficientsLeft, base_plate_dict, "left")
@@ -371,34 +306,29 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
     if Tvec_obj_left is not None:
         if Tvec_base_left is not None:
             Tvec_base_obj_left = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
-
+            print(Tvec_base_obj_left)
 
     for d in dR:  
-        tagId =  int(d.tag_id)
-        rightSize = getMarkerSize(tagId, shape)
-        if rightSize is None:
-            print("not in working order")
-            continue
-        rightCornerPoints = cornerStone(float(rightSize))
-        rightCornerPoints = rightCornerPoints.reshape(4, 3).astype(np.float32)
-        imagePointRight = d.corners.reshape(4,2).astype(np.float32)
-        for i, (x,y) in enumerate(d.corners):
-            cv2.putText(right_img, str(i), (int(x), int(y)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+        for f in range(d.corners.shape[0]):
+            cv2.circle(right_img, center=(int(d.corners[f][0]), int(d.corners[f][1])), radius=5, color=(0, 0,250))
+        if d.tag_id in sizeByShape["BasePlate"]:
+            mids_base_right.append(d.tag_id)
+            markerPose(d.tag_id, "BasePlate", d.corners, d.center, right_img, cameraMatrixRight, distortionCoefficientsRight, T_cam_base_right)
 
-        cv2.putText(right_img, f"id={str(tagId)}" , (int(d.center[0])+25, int(d.center[1])),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-        rVec_markers_right, tVec_markers_right = choosePose(rightCornerPoints, imagePointRight, cameraMatrixRight, distortionCoefficientsRight)
-        testrVec_markers_right = rVec_markers_right.reshape(3,1)
-        R_cam_marker, _ = cv2.Rodrigues(testrVec_markers_right)
-        T = np.eye(4)
-        T[:3,:3] = R_cam_marker
-        T[:3,3]  = tVec_markers_right[:,0]
-        T_cam_marker_meas_right[tagId] = T
+        if d.tag_id in sizeByShape[shape]:
+            mids_obj_right.append(d.tag_id)
+            markerPose(d.tag_id, shape, d.corners, d.center, right_img, cameraMatrixRight, distortionCoefficientsRight, T_cam_marker_meas_right)
 
-        cv2.circle(right_img, center=(int(d.center[0]), int(d.center[1])), radius=5, color=(0, 250,0))
-        cv2.drawFrameAxes(right_img, cameraMatrixRight, distortionCoefficientsRight, rVec_markers_right, tVec_markers_right, 0.01)
-        # markerPose(d.tag_id, shape, d.corners, d.center, right, cameraMatrixRight, distortionCoefficientsRight, T_cam_marker_meas_right)
+    Tvec_obj_right = posePicker(mids_obj_right, T_cam_marker_meas_right, right_img, cameraMatrixRight, distortionCoefficientsRight, marker_obj_dict, "right")
+    if mids_base_right:
+        Tvec_base_right = posePicker(mids_base_right, T_cam_base_right, right_img, cameraMatrixRight, distortionCoefficientsRight, base_plate_dict, "right")
+    print(Tvec_obj_right, "potato")
+    if Tvec_obj_right is not None:
+        if Tvec_base_right is not None:
+            Tvec_base_obj_right = np.linalg.inv(Tvec_base_right) @ Tvec_obj_right
+            print(Tvec_base_obj_right)
+
+        
     mids_right = list(T_cam_marker_meas_right.keys())
     if len(mids_right) < 2:
         if len(mids_right) == 0:
@@ -410,30 +340,7 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
             rVec_obj_right,_ = cv2.Rodrigues(R_obj)
             tVec_obj_right = T_obj
             cv2.drawFrameAxes(right_img, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-    else:
-        A, score, perB = referencePicker(mids_right, T_cam_marker_meas_right, marker_obj_dict)
 
-        inliers = [A]
-        outliers = []
-        for B, res in perB.items():
-            if res["dang"] > 12.0 or res["dt"] > 0.02:
-                outliers.append(B)
-            else:
-                inliers.append(B)
-        
-        print("right inliers:", inliers, "\n" , "right outliers:", outliers,"\n", sep="")
-
-        T_list = [T_cam_marker_meas_right[inliers[mid]] @ marker_obj_dict[inliers[mid]] for mid in range(len(inliers))]
-        T_cam_obj = fuse_T(T_list)
-
-        R_obj= T_cam_obj[:3, :3]
-        T_obj = T_cam_obj[:3, 3]
-        rVec_obj_right,_  =cv2.Rodrigues(R_obj)
-        tVec_obj_right = T_obj
-        cv2.drawFrameAxes(right_img, cameraMatrixRight, distortionCoefficientsRight, rVec_obj_right, tVec_obj_right, 0.01)
-
-        for f in range(d.corners.shape[0]):
-            cv2.circle(right_img, center=(int(d.corners[f][0]), int(d.corners[f][1])), radius=5, color=(0, 0,250))
 
     cv2.imshow('detecting markers left', left_img)
     cv2.imshow('detecting markers right', right_img)
