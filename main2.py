@@ -283,7 +283,7 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
     elif shape == "Icosahedron":
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
     elif shape == "Winged":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_test_fileCoM_semicolon_rezero.csv", obj_name="CoM")
     base_plate_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\baseplate(Correct orientation).coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
     for c in dL:  
         # tagId =  int(c.tag_id)
