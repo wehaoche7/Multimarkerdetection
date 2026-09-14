@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import numpy as np
 import csv
+import pyzed.sl as sl
 print(cv2.__version__)
 
 imgpath=Path(r"C:\Users\wehao\Downloads\Python\Markers")
