@@ -9,12 +9,14 @@ print(cv2.__version__)
 size = None
 
 # Marker size per shape (note Icosahedron has two different marker sizes)
-# sizeByShape = {
-#     "Square" : {134 : 0.036, 101 : 0.036, 99 : 0.036, 103 : 0.036, 183 : 0.036},
-#     "Dodecahedron" : {147 : 0.019, 186 : 0.019, 184 : 0.019, 133 : 0.019, 166 : 0.019, 86 : 0.019, 57 : 0.019, 174 : 0.019, 104 : 0.019, 3 : 0.019, 5 : 0.019},
-#     "Icosahedron" : {44 : 0.013, 47 : 0.013, 61 : 0.013, 209 : 0.013, 187 : 0.013, 132 : 0.013, 246 : 0.013, 227 : 0.013, 28 : 0.013, 144 : 0.013, 111 : 0.013, 232 : 0.013, 60 : 0.013, 182 : 0.013, 135 : 0.013, 12 : 0.013,
-#                      77 : 0.013, 237 : 0.013, 31 : 0.013, 37 : 0.013, 17 : 0.01, 211 : 0.01, 224 : 0.01, 202 : 0.01, 30 : 0.01, 15 : 0.01, 85 : 0.01, 55 : 0.01, 147 : 0.01, 225 : 0.01, 108 : 0.01, 116 : 0.01}
-# }
+sizeByShape = {
+    "Square" : {12 : 0.036, 146 : 0.036, 173 : 0.036, 255 : 0.036, 206 : 0.036},
+    "Dodecahedron" : {193 : 0.019, 556 : 0.019, 386 : 0.019, 462 : 0.019, 360 : 0.019, 340 : 0.019, 284 : 0.019, 70 : 0.019, 493 : 0.019, 300 : 0.019, 183 : 0.019},
+    "Icosahedron" : {348 : 0.013, 495 : 0.013, 163 : 0.013, 392 : 0.013, 93 : 0.013, 123 : 0.013, 92 : 0.013, 290 : 0.013, 169 : 0.013, 12 : 0.013, 416 : 0.013, 394 : 0.013, 513 : 0.013, 203 : 0.013, 434 : 0.013, 380 : 0.013,
+                     45 : 0.013, 33 : 0.013,576 : 0.013, 324 : 0.013, 494 : 0.01, 536 : 0.01, 321 : 0.01, 349 : 0.01, 586 : 0.01, 293 : 0.01, 582 : 0.01, 222 : 0.01, 18 : 0.01, 337 : 0.01, 339 : 0.01, 510 : 0.01},
+    "Winged" : {341 : 0.065, 185 : 0.065, 24 : 0.065, 226 : 0.065, 547 : 0.065, 78 : 0.05, 511 : 0.05, 26 : 0.05, 438 : 0.05, 254 : 0.05, 69 : 0.05, 32 : 0.05, 200 : 0.05},
+    "BasePlate" :{373 : 0.0792, 503  : 0.0792, 284 : 0.0792, 323 : 0.0792, 463 : 0.0792, 10 : 0.0792}
+}
 # Archaic position data, is still required by icosahedron as i didn't manage to make the new data files for dodecahedrons yet
 
 sizeByShape ={
@@ -173,7 +175,11 @@ def detection(path, shape, distance, tag=None, degrees=None):
         marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Dodecacorrect.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
     
     elif shape == "Icosahedron":
-        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Aruco_fileCoM_semicolon.csv", obj_name="CoM")
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Truncasted icosahedron.coord_systems_rel_Aruco_fileCoM_semicolon - kopie.csv", obj_name="CoM")
+
+    elif shape == "Winged":
+        marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\LFD_handle_REV-1.1_WC.coord_systems_rel_Trial_fileCoM_semicolon.csv", obj_name="CoM")
+
     
     if ids1 is not None:
         cv2.aruco.drawDetectedMarkers(left, corners1, ids1)
@@ -393,6 +399,7 @@ k23 = 0.0050
 k24 = 0.0000
 k25 = -0.0000
 k26 = 0.0000
+
 i=0
 EPS = 1e-6
 
@@ -432,16 +439,7 @@ degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Double"]
 
-# tagsize = ["small", "large"]
-# distance = ["1.2", "1.5", "2"]
-# # degrees = ["10", "20", "30", "40"]
-# shape = ["Square", "Dodecahedron", "Icosahedron"]
-# degrees = ["10", "20", "30", "40", "45"]
-# tag = ["Aruco", "Apriltag"]
-
-folder = ["First day", "Second day", "Double", ""]
-
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Double (3), ""(4)\n")
+choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2)\n")
 shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), or all shapes (4)\n")
 sizechoice = input("I require size choice: Small(1), Large(2)")
 
