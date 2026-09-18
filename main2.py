@@ -6,19 +6,43 @@ import numpy as np
 import csv
 import pyzed.sl as sl
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 print(cv2.__version__)
 zed = sl.Camera()
 init_params = sl.InitParameters()
 
 #Change depending on test data (top normal bottom depth)
 img_path=Path(r"C:\Users\wehao\Downloads\Python\Markers")
-video_path = r"C:\Users\wehao\Downloads\Python\Markers\SVO2\HD720_SN17640832_09-13-28.svo2"
+video_path = r"C:\Users\wehao\Downloads\Python\Markers\Winged\HD720_SN12041574_12-08-57.svo2"
 init_params.set_from_svo_file(video_path)
-err = zed.open(init_params)
+
 depth_zed = sl.Mat()
 init_params.depth_mode = sl.DEPTH_MODE.NEURAL
 init_params.coordinate_units = sl.UNIT.METER
+frame_choice_start = int(input("Please put in an starting frame"))
+frame_choice_end = int(input("Please put in an ending frame"))
 
+err = zed.open(init_params)
+zed.set_svo_position(frame_choice_start)
+cam_info = zed.get_camera_information()
+calib = cam_info.camera_configuration.calibration_parameters
+left_calibration = calib.left_cam
+right_calibration = calib.right_cam
+cameraMatrixLeft = np.array([
+    [left_calibration.fx, 0,       left_calibration.cx],
+    [0,       left_calibration.fy, left_calibration.cy],
+    [0,       0,       1]
+], dtype=np.float64)
+
+cameraMatrixRight = np.array([
+    [right_calibration.fx, 0,       right_calibration.cx],
+    [0,       right_calibration.fy, right_calibration.cy],
+    [0,       0,       1]
+], dtype=np.float64)
+distortionCoefficientsLeft = np.zeros(5)
+distortionCoefficientsRight = np.zeros(5)
+print("LEFT:", left_calibration.fx, left_calibration.fy, left_calibration.cx, left_calibration.cy)
+print("RIGHT:", right_calibration.fx, right_calibration.fy, right_calibration.cx, right_calibration.cy)
 if err != sl.ERROR_CODE.SUCCESS:
     print("Could not open SVO2:", err)
     exit()
@@ -102,20 +126,23 @@ def load_marker_obj_dict(csv_path, obj_name="CoM"):
 
     return out
 
-def get_depth(depth_map, pixels):
+def get_depth(depth_map, pixels, radius = 3):
     x_corner = int(round(pixels[0]))
     y_corner = int(round(pixels[1]))
-    print("potato")
-    if (x_corner < 0 or x_corner >= depth_map.shape[0] or 
-        y_corner < 0 or y_corner >= depth_map.shape[1]
-    ):
+
+    y0 = max(0, y_corner - radius)
+    y1 = min(depth_map.shape[0], y_corner + radius + 1)
+    x0 = max(0, x_corner - radius)
+    x1 = min(depth_map.shape[1], x_corner + radius + 1)
+    patch = depth_map[y0:y1, x0:x1]
+    valid = patch[
+        np.isfinite(patch) &
+        (patch > 0)
+    ]
+    if len(valid) == 0:
         return None
     
-    z = depth_map[y_corner, x_corner]
-    if not np.isfinite(z) or z <= 0:
-        return None
-
-    return float(z)
+    return float(np.median(valid))
 
 def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
     best = None
@@ -129,7 +156,7 @@ def best_yaw_for_marker(T_cam_obj_ref, T_cam_marker_meas_B, T_marker_obj_B):
     return best
 
 def choosePose(corners, imagePoints, cameraMatrix, distortionCoefficients):
-    ok, rVecs, tVecs,_ = cv2.solvePnPGeneric(corners, imagePoints, cameraMatrix, distortionCoefficients,  flags=cv2.SOLVEPNP_ITERATIVE)
+    ok, rVecs, tVecs,_ = cv2.solvePnPGeneric(corners, imagePoints, cameraMatrix, distortionCoefficients,  flags=cv2.SOLVEPNP_IPPE_SQUARE)
     if not ok or len(rVecs) == 0:
         return None
     best = None
@@ -138,6 +165,7 @@ def choosePose(corners, imagePoints, cameraMatrix, distortionCoefficients):
     for rVecs, tVecs in zip(rVecs, tVecs):
         if tVecs[2,0] <= 0:
             print("z negative -> corner order / pose ambiguity issue")
+            continue
         projection, _ = cv2.projectPoints(corners, rVecs, tVecs, cameraMatrix, distortionCoefficients)
         projection = projection.reshape(-1,2)
         calculatedError = float(np.mean(np.linalg.norm(projection-imagePoints, axis=1)))
@@ -153,10 +181,16 @@ def getMarkerSize(markerId, shape):
 
 def cornerStone(markerSize):
     h=markerSize/2
-    return np.array([[-h, -h, 0.0],
-                    [h, -h, 0.0],
-                    [h, h, 0.0],
-                    [-h, h, 0.0]])
+    # return np.array([[-h, -h, 0.0],
+    #                 [h, -h, 0.0],
+    #                 [h, h, 0.0],
+    #                 [-h, h, 0.0]])
+    return np.array([
+        [-h,  h, 0.0],   # top-left
+        [ h,  h, 0.0],   # top-right
+        [ h, -h, 0.0],   # bottom-right
+        [-h, -h, 0.0],   # bottom-left
+    ], dtype=np.float32)
 
 def referencePicker(mids, T_cam_marker_meas, marker_dict):
     bestA = None
@@ -196,6 +230,17 @@ def fuse_T(T_list):
     T[:3,3] = t
     return T
 
+def H_to_pose(H_matrix):
+    position = H_matrix[:3,3]
+    rotation_matrix = H_matrix[:3,:3]
+    qx, qy, qz, qw = R.from_matrix(rotation_matrix).as_quat()
+
+    return np.array([
+        position[0],
+        position[1],
+        position[2]
+    , qx, qy, qz, qw])
+
 
 def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, distortionCoefficients, T_cam_marker_meas):
     tagId =  int(markerId)
@@ -207,7 +252,8 @@ def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, 
     
     CornerPoints = cornerStone(float(Size))
     CornerPoints = CornerPoints.reshape(4, 3).astype(np.float32)
-    imagePoint = markerCorner.reshape(4,2).astype(np.float32)
+    # imagePoint = markerCorner.reshape(4,2).astype(np.float32)
+    imagePoint = markerCorner[[3, 2, 1, 0]].astype(np.float32)
     for i, (x,y) in enumerate(markerCorner):
         cv2.putText(side, str(i), (int(x), int(y)),
         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
@@ -219,6 +265,7 @@ def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, 
     T[:3,:3] = R_cam_marker
     T[:3,3]  = tVec_markers[:,0]
     T_cam_marker_meas[tagId] = T
+    # print(T[2,3], "potato", tagId)
     cv2.circle(side, center=(int(markerMiddle[0]), int(markerMiddle[1])), radius=5, color=(0, 250,0))
     cv2.drawFrameAxes(side, cameraMatrix, distortionCoefficients, rVec_markers, tVec_markers, 0.02)
 
@@ -263,7 +310,8 @@ def posePicker(mids_obj, T_cam_tracked_obj, side, cameraMatrix, distortionCoeffi
     return T_cam_obj
 
 def detection(path, shape, distance=None, tag=None, degrees=None):
-    while True:
+    T_base_reference = None
+    while int(zed.get_svo_position()) <= frame_choice_end:
         T_cam_marker_meas_right = {}
         T_cam_marker_meas_left = {}
         T_cam_base_right = {}
@@ -272,56 +320,57 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
         T_cam_base_left = {}
         mids_base_left = []
         mids_obj_left = []
+        
         Tvec_ee_right = None
         Tvec_ee_left = None
         Tvec_base_left = None
         Tvec_base_obj_left = None
         Tvec_base_right = None
         Tvec_base_obj_right = None
-        zed.retrieve_image(zed_left, sl.VIEW.LEFT)
-        zed.retrieve_image(zed_right, sl.VIEW.RIGHT)
-        zed.retrieve_measure(depth_zed, sl.MEASURE.DEPTH)
-        frame_position = zed.get_svo_position()
-        depth_map = depth_zed.get_data()
-        frame_left = zed_left.get_data()
-        frame_right = zed_right.get_data()
         err = zed.grab(runtime_params)
+        frame_position = zed.get_svo_position()
+        used_clahe_L = False
+        used_clahe_R = False
+
+        
         if err == sl.ERROR_CODE.SUCCESS:
-            
-            # img=cv2.imread(path)
-            # h,w = img.shape[:2]
-            # left_img = img[:,:w//2]
-            # right_img = img[:,w//2:]
+            zed.retrieve_image(zed_left, sl.VIEW.LEFT)
+            zed.retrieve_image(zed_right, sl.VIEW.RIGHT)
+            zed.retrieve_measure(depth_zed, sl.MEASURE.DEPTH)
+            frame_left = zed_left.get_data()
+            depth_map = depth_zed.get_data()
+            frame_right = zed_right.get_data()
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
             left_g  = cv2.cvtColor(frame_left, cv2.COLOR_BGR2GRAY)
             right_g = cv2.cvtColor(frame_right, cv2.COLOR_BGR2GRAY)
-            dL_Raw=detector.detect(left_g)
-            dR_Raw=detector.detect(right_g)
-            counters["total"] += 1
-            used_clahe_L = False
-            used_clahe_R = False
+            frame = zed_left.get_data()
+            height  = frame.shape[:2]
+            print("Frame resolution:", height, "x", height)
+            print("Full shape:", frame.shape)
+            dL = detector.detect(left_g)
+            dR = detector.detect(right_g)
 
-            dL = dL_Raw
-            dR = dR_Raw  
-            tag_ids_left = [tags.tag_id for tags in dL]
-            tag_ids_right= [tags.tag_id for tags in dR]
-            print("\nMarkers detected left:", tag_ids_left if tag_ids_left is not None else None, "\n" )
-            print("Markers detected right:", tag_ids_right if tag_ids_right is not None else None, "\n" )
+            
 
-            if not tag_ids_left:
-                counters["left_missing"] += 1
-                print("Missing left marker counter: ", counters["left_missing"])
-
-            if not tag_ids_right:
-                counters["right_missing"] += 1
-                print("Missing right marker counter: ", counters["right_missing"])
-
-            if len(dL_Raw) == 0:
+            if len(dL) == 0:
                 dL = detector.detect(clahe.apply(left_g))
                 used_clahe_L = True
-            if len(dR_Raw ) == 0:
+
+            if len(dR) == 0:
                 dR = detector.detect(clahe.apply(right_g))
                 used_clahe_R = True
+
+            tag_ids_left = [tag.tag_id for tag in dL]
+            tag_ids_right = [tag.tag_id for tag in dR]
+
+            print("\nMarkers detected left:", tag_ids_left)
+            print("Markers detected right:", tag_ids_right)
+
+            if len(dL) == 0:
+                counters["left_missing"] += 1
+
+            if len(dR) == 0:
+                counters["right_missing"] += 1
             
             if shape == "Square":
                 marker_obj_dict = load_marker_obj_dict(r"C:\Users\wehao\Downloads\Objects\Cubegeometry.coord_systems_rel_Apriltag_fileCoM_semicolon.csv", obj_name="CoM")
@@ -347,9 +396,10 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
 
                 print(
                     "Marker:", c.tag_id,
-                    "ZED depth:", depth
+                    "ZED depth:", depth,
+                    "markermarker", 
                 )
-                            
+                
 
             Tvec_obj_left = posePicker(mids_obj_left, T_cam_marker_meas_left, frame_left, cameraMatrixLeft, distortionCoefficientsLeft, marker_obj_dict, "left")
             if Tvec_obj_left is not None:
@@ -360,13 +410,43 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
 
             if mids_base_left:
                 Tvec_base_left = posePicker(mids_base_left, T_cam_base_left, frame_left, cameraMatrixLeft, distortionCoefficientsLeft, base_plate_dict, "left")
+                if Tvec_base_left is not None and T_base_reference is None:
+                    T_base_reference = Tvec_base_left.copy()
 
-            if Tvec_ee_left is not None:
-                    if Tvec_base_left is not None:
-                        Tvec_base_obj_left = np.linalg.inv(Tvec_base_left) @ Tvec_ee_left
-                        Tvec_position_left[frame_position] = Tvec_base_obj_left.copy()
+
+            if Tvec_ee_left is not None and T_base_reference is not None:
+                Tvec_base_obj_left = (
+                    np.linalg.inv(T_base_reference)
+                    @ Tvec_ee_left
+                )
+                Tvec_pose_left[frame_position] = Tvec_base_obj_left.copy()
+
+            # if Tvec_ee_left is not None and Tvec_base_left is not None:
+            #     Tvec_base_obj_left = np.linalg.inv(Tvec_base_left) @ Tvec_ee_left
+            #     Tvec_position_left[frame_position] = Tvec_base_obj_left.copy()
+            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
+
+            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
+            #     p = T_base_CoM[:3, 3]
+            #     R = T_base_CoM[:3, :3]
+
+            #     print("p:", p)
+            #     print("R:\n", R)
+            #     print("camera CoM:", Tvec_obj_left[:3, 3])
+
+            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
+            #     print("base CoM:", T_base_CoM[:3, 3])
+            #     T_cam_base_reference = Tvec_base_left.copy()
+            #     T_base_CoM_fixed = (
+            #         np.linalg.inv(T_cam_base_reference)
+            #         @ Tvec_obj_left
+            #     )
+
+            #     print(T_base_CoM_fixed[:3, 3])
+
+
             else:
-                Tvec_position_left[frame_position] = None     
+                Tvec_pose_left[frame_position] = None     
 
 
             for d in dR:  
@@ -390,9 +470,11 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
             if mids_base_right:
                 Tvec_base_right = posePicker(mids_base_right, T_cam_base_right, frame_right, cameraMatrixRight, distortionCoefficientsRight, base_plate_dict, "right")
 
-            if Tvec_ee_right is not None:
-                if Tvec_base_right is not None:
+            if Tvec_ee_right is not None and Tvec_base_right is not None:
                     Tvec_base_obj_right = np.linalg.inv(Tvec_base_right) @ Tvec_ee_right
+                    Tvec_pose_right[frame_position] = Tvec_base_obj_right.copy()
+            else:
+                Tvec_pose_right[frame_position] = None   
 
 
 
@@ -413,29 +495,6 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
             f"{degrees + "°" + ' ' if degrees else ''}" 
             f"{distance}m")
 
-    # while True: 
-    #     print("Is the orientation of the object frame correct for the left image? Yes (1), No (2)\n")
-    #     key_left = cv2.waitKey(0) & 0xFF
-    #     if key_left == ord("1"):
-    #             counters["left_correct_objectframe"] +=1
-    #             print("Left orientation chosen to be correct\n")
-    #             break
-    #     elif key_left == ord("2"): 
-    #             print("Left orientation chosen to be incorrect\n")
-    #             break
-
-    # while True: 
-    #     print("Is the orientation of the object frame correct for the right image? Yes (1), No (2)\n")
-    #     key_right = cv2.waitKey(0) & 0xFF
-    #     if key_right == ord("1"):
-    #             counters["right_correct_objectframe"] +=1
-    #             print("Right orientation chosen to be correct\n")
-    #             cv2.destroyAllWindows()
-    #             break
-    #     elif key_right == ord("2"): 
-    #             print("right orientation chosen to be incorrect\n")
-    #             break       
-
     cv2.destroyAllWindows()
 
 # To avoid trouble with the already programmed code
@@ -447,7 +506,8 @@ degrees = ["10", "20", "30", "40"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
 folder = ["First day", "Second day", "Winged"]
-Tvec_position_left = {}
+Tvec_pose_left = {}
+Tvec_pose_right = {}
 i = 0
 EPS = 1E-6
 
@@ -546,14 +606,21 @@ elif int(choice) == 3:
                 print("Current iteration", i)
                 detection(f, "Winged")
                 print("Total frames:", total_frames)
-                frame_positions = sorted(Tvec_position_left.keys())
+                frame_positions = sorted(Tvec_pose_left.keys())
 
 
                 positions = np.array([
-                    Tvec_position_left[frame][:3, 3]
+                    Tvec_pose_left[frame][:3, 3]
                     for frame in frame_positions
-                    if Tvec_position_left[frame] is not None
+                    if Tvec_pose_left[frame] is not None
                 ])
+
+                pose_data = np.array([
+                    H_to_pose(Tvec_pose_left[frame])
+                    for frame in frame_positions
+                    if Tvec_pose_left[frame] is not None
+                ])
+                print(pose_data)
                 x = positions[:, 0]
                 y = positions[:, 1]
                 z = positions[:, 2]
@@ -563,7 +630,24 @@ elif int(choice) == 3:
                 ax.plot(x, y, z)
                 ax.scatter(x[0], y[0], z[0], label="Start")
                 ax.scatter(x[-1], y[-1], z[-1], label="End")
+                max_range = max(
+                    x.max() - x.min(),
+                    y.max() - y.min(),
+                    z.max() - z.min()
+                )
 
+                # Centre of each axis
+                x_mid = (x.max() + x.min()) / 2
+                y_mid = (y.max() + y.min()) / 2
+                z_mid = (z.max() + z.min()) / 2
+
+                half = max_range / 2
+
+                ax.set_xlim(x_mid - half, x_mid + half)
+                ax.set_ylim(y_mid - half, y_mid + half)
+                ax.set_zlim(z_mid - half, z_mid + half)
+
+                ax.set_box_aspect((1, 1, 1))
                 ax.set_xlabel("X [m]")
                 ax.set_ylabel("Y [m]")
                 ax.set_zlabel("Z [m]")
