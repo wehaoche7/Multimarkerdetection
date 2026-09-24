@@ -6,52 +6,76 @@ import numpy as np
 import csv
 import pyzed.sl as sl
 import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.spatial.transform import Rotation as R
+from scipy.interpolate import make_smoothing_spline
+from scipy.spatial.transform import Rotation as R, Slerp
 print(cv2.__version__)
 zed = sl.Camera()
 init_params = sl.InitParameters()
 
-#Change depending on test data (top normal bottom depth)
+
 img_path=Path(r"C:\Users\wehao\Downloads\Python\Markers")
-video_path = r"C:\Users\wehao\Downloads\Python\Markers\Winged\HD720_SN12041574_12-08-57.svo2"
-init_params.set_from_svo_file(video_path)
 
-depth_zed = sl.Mat()
-init_params.depth_mode = sl.DEPTH_MODE.NEURAL
-init_params.coordinate_units = sl.UNIT.METER
-frame_choice_start = int(input("Please put in an starting frame"))
-frame_choice_end = int(input("Please put in an ending frame"))
+def zed_picker(video_path, autoplay_choice):
+        init_params.set_from_svo_file(str(video_path))
+        init_params.depth_mode = sl.DEPTH_MODE.NEURAL
+        init_params.coordinate_units = sl.UNIT.METER
+        err = zed.open(init_params)
 
-err = zed.open(init_params)
-zed.set_svo_position(frame_choice_start)
-cam_info = zed.get_camera_information()
-calib = cam_info.camera_configuration.calibration_parameters
-left_calibration = calib.left_cam
-right_calibration = calib.right_cam
-cameraMatrixLeft = np.array([
-    [left_calibration.fx, 0,       left_calibration.cx],
-    [0,       left_calibration.fy, left_calibration.cy],
-    [0,       0,       1]
-], dtype=np.float64)
+        if err != sl.ERROR_CODE.SUCCESS:
+            print("Could not open SVO2:", err)
+            exit()
+        runtime_params = sl.RuntimeParameters()
+        depth_zed = sl.Mat()
+        if autoplay_choice == 1:
+            frame_choice_start = 0
+            frame_choice_end = zed.get_svo_number_of_frames() - 1
+        elif autoplay_choice == 2:
+            frame_choice_start = int(input("Please put in an starting frame"))
+            frame_choice_end = int(input("Please put in an ending frame"))
 
-cameraMatrixRight = np.array([
-    [right_calibration.fx, 0,       right_calibration.cx],
-    [0,       right_calibration.fy, right_calibration.cy],
-    [0,       0,       1]
-], dtype=np.float64)
-distortionCoefficientsLeft = np.zeros(5)
-distortionCoefficientsRight = np.zeros(5)
-print("LEFT:", left_calibration.fx, left_calibration.fy, left_calibration.cx, left_calibration.cy)
-print("RIGHT:", right_calibration.fx, right_calibration.fy, right_calibration.cx, right_calibration.cy)
-if err != sl.ERROR_CODE.SUCCESS:
-    print("Could not open SVO2:", err)
-    exit()
-    
-runtime_params = sl.RuntimeParameters()
+        
+        zed.set_svo_position(frame_choice_start)
+        cam_info = zed.get_camera_information()
+        calib = cam_info.camera_configuration.calibration_parameters
+        left_calibration = calib.left_cam
+        right_calibration = calib.right_cam
+        cameraMatrixLeft = np.array([
+            [left_calibration.fx, 0,       left_calibration.cx],
+            [0,       left_calibration.fy, left_calibration.cy],
+            [0,       0,       1]
+        ], dtype=np.float64)
 
-zed_left = sl.Mat()
-zed_right = sl.Mat()
+        cameraMatrixRight = np.array([
+            [right_calibration.fx, 0,       right_calibration.cx],
+            [0,       right_calibration.fy, right_calibration.cy],
+            [0,       0,       1]
+        ], dtype=np.float64)
+        distortionCoefficientsLeft = np.zeros(5)
+        distortionCoefficientsRight = np.zeros(5)
+        print("LEFT:", left_calibration.fx, left_calibration.fy, left_calibration.cx, left_calibration.cy)
+        print("RIGHT:", right_calibration.fx, right_calibration.fy, right_calibration.cx, right_calibration.cy)
 
+        
+
+        zed_left = sl.Mat()
+        zed_right = sl.Mat()
+        
+        data = {
+        "cameraMatrixLeft": cameraMatrixLeft,
+        "cameraMatrixRight": cameraMatrixRight,
+        "distortionCoefficientsLeft": distortionCoefficientsLeft,
+        "distortionCoefficientsRight": distortionCoefficientsRight,
+        "frame_start": frame_choice_start,
+        "frame_end": frame_choice_end,
+        "zed_left": zed_left,
+        "zed_right": zed_right,
+        "depth": depth_zed,
+        "runtime_params": runtime_params
+    }
+
+        return data
 
 detector = Detector(
     families="tag36h11",
@@ -231,15 +255,10 @@ def fuse_T(T_list):
     return T
 
 def H_to_pose(H_matrix):
-    position = H_matrix[:3,3]
     rotation_matrix = H_matrix[:3,:3]
     qx, qy, qz, qw = R.from_matrix(rotation_matrix).as_quat()
 
-    return np.array([
-        position[0],
-        position[1],
-        position[2]
-    , qx, qy, qz, qw])
+    return np.array([qx, qy, qz, qw])
 
 
 def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, distortionCoefficients, T_cam_marker_meas):
@@ -265,7 +284,6 @@ def markerPose(markerId, shape, markerCorner, markerMiddle, side, cameraMatrix, 
     T[:3,:3] = R_cam_marker
     T[:3,3]  = tVec_markers[:,0]
     T_cam_marker_meas[tagId] = T
-    # print(T[2,3], "potato", tagId)
     cv2.circle(side, center=(int(markerMiddle[0]), int(markerMiddle[1])), radius=5, color=(0, 250,0))
     cv2.drawFrameAxes(side, cameraMatrix, distortionCoefficients, rVec_markers, tVec_markers, 0.02)
 
@@ -309,8 +327,9 @@ def posePicker(mids_obj, T_cam_tracked_obj, side, cameraMatrix, distortionCoeffi
 
     return T_cam_obj
 
-def detection(path, shape, distance=None, tag=None, degrees=None):
+def detection(shape, zed_data, distance=None, tag=None, degrees=None):
     T_base_reference = None
+    frame_choice_end = zed_data["frame_end"]
     while int(zed.get_svo_position()) <= frame_choice_end:
         T_cam_marker_meas_right = {}
         T_cam_marker_meas_left = {}
@@ -320,18 +339,22 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
         T_cam_base_left = {}
         mids_base_left = []
         mids_obj_left = []
-        
         Tvec_ee_right = None
         Tvec_ee_left = None
         Tvec_base_left = None
         Tvec_base_obj_left = None
         Tvec_base_right = None
         Tvec_base_obj_right = None
+        zed_left = zed_data["zed_left"]
+        zed_right = zed_data["zed_right"]
+        runtime_params = zed_data["runtime_params"]
+        depth_zed = zed_data["depth"]
         err = zed.grab(runtime_params)
         frame_position = zed.get_svo_position()
         used_clahe_L = False
         used_clahe_R = False
-
+        
+        
         
         if err == sl.ERROR_CODE.SUCCESS:
             zed.retrieve_image(zed_left, sl.VIEW.LEFT)
@@ -345,8 +368,6 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
             right_g = cv2.cvtColor(frame_right, cv2.COLOR_BGR2GRAY)
             frame = zed_left.get_data()
             height  = frame.shape[:2]
-            print("Frame resolution:", height, "x", height)
-            print("Full shape:", frame.shape)
             dL = detector.detect(left_g)
             dR = detector.detect(right_g)
 
@@ -392,13 +413,7 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
                 if c.tag_id in sizeByShape[shape]:
                     mids_obj_left.append(c.tag_id)
                     markerPose(c.tag_id, shape, c.corners, c.center, frame_left, cameraMatrixLeft, distortionCoefficientsLeft, T_cam_marker_meas_left)
-                depth = get_depth(depth_map, c.center)
 
-                print(
-                    "Marker:", c.tag_id,
-                    "ZED depth:", depth,
-                    "markermarker", 
-                )
                 
 
             Tvec_obj_left = posePicker(mids_obj_left, T_cam_marker_meas_left, frame_left, cameraMatrixLeft, distortionCoefficientsLeft, marker_obj_dict, "left")
@@ -420,29 +435,6 @@ def detection(path, shape, distance=None, tag=None, degrees=None):
                     @ Tvec_ee_left
                 )
                 Tvec_pose_left[frame_position] = Tvec_base_obj_left.copy()
-
-            # if Tvec_ee_left is not None and Tvec_base_left is not None:
-            #     Tvec_base_obj_left = np.linalg.inv(Tvec_base_left) @ Tvec_ee_left
-            #     Tvec_position_left[frame_position] = Tvec_base_obj_left.copy()
-            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
-
-            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
-            #     p = T_base_CoM[:3, 3]
-            #     R = T_base_CoM[:3, :3]
-
-            #     print("p:", p)
-            #     print("R:\n", R)
-            #     print("camera CoM:", Tvec_obj_left[:3, 3])
-
-            #     T_base_CoM = np.linalg.inv(Tvec_base_left) @ Tvec_obj_left
-            #     print("base CoM:", T_base_CoM[:3, 3])
-            #     T_cam_base_reference = Tvec_base_left.copy()
-            #     T_base_CoM_fixed = (
-            #         np.linalg.inv(T_cam_base_reference)
-            #         @ Tvec_obj_left
-            #     )
-
-            #     print(T_base_CoM_fixed[:3, 3])
 
 
             else:
@@ -505,7 +497,8 @@ distance = ["0.25", "0.5", "0.75", "1"]
 degrees = ["10", "20", "30", "40"]
 degrees = ["10", "20", "30", "40", "45"]
 tag = ["Aruco", "Apriltag"]
-folder = ["First day", "Second day", "Winged"]
+folder = ["First day", "Second day", "Straight", "Rectangle", "Roll"]
+experiments = ["Straight", "Rectangle", "Roll"]
 Tvec_pose_left = {}
 Tvec_pose_right = {}
 i = 0
@@ -566,14 +559,22 @@ cameraMatrixRight= np.array([[fx2, 0, cx2],
                [0, 0, 1]])
 
 
-choice = input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Winged(3)\n")
-shapechoice = input("Please input, which shape you would like to inspect from: Square (1), Dodecahedron (2), Truncated Icosahedron (3), Winged(4), or all shapes (5)\n")
+choice = int(input("Please input, which data file you would wish to access from: First Day (1), Second Day (2), Winged(3)\n"))
+
+if choice != 3:
+    shapechoice = int(input(
+        "Rectangle (1), Dodecahedron (2), "
+        "Truncated Icosahedron (3), Winged (4), "
+        "All shapes (5): "
+    ))
+    if int(shapechoice) == 5:
+        shape_used = shape
+    else:
+        shape_used = [shape[int(shapechoice)-1]]
 
 
-if int(shapechoice) == 5:
-    shape_used = shape
-else:
-    shape_used = [shape[int(shapechoice)-1]]
+
+
 if int(choice) == 1:    
         newImgPath = img_path / folder[int(choice) - 1]
         for x in range(len(shape_used)):
@@ -598,35 +599,55 @@ elif int(choice) == 2:
                                 print("Current iteration", i)
                                 detection(f, shape_used[x], distance[l], tag[1], degrees[d])
 elif int(choice) == 3:
-        newImgPath = img_path / folder[int(choice) - 1]
+        experiment_number = int(input("Choose experiment: Straight(1), Rectangle(2), Roll(3)"))
+        newImgPath = img_path / "Winged" / experiments[int(experiment_number) - 1]
+        experiment_type = experiments[experiment_number-1]
+        autoplay_choice = int(input("Autoplay: Active(1), Inactive(2)"))
+        experimental_data = {}
         for f in newImgPath.iterdir():
+            print("Found:", f.name)
             if f.is_file() and f.suffix.lower() == ".svo2":
+                zed_data = zed_picker(f, autoplay_choice)
                 total_frames = zed.get_svo_number_of_frames()
-                # i+=1
+                i+=1
                 print("Current iteration", i)
-                detection(f, "Winged")
+                Tvec_pose_left.clear()
+                
+                detection("Winged", zed_data)
+                zed.close()
                 print("Total frames:", total_frames)
                 frame_positions = sorted(Tvec_pose_left.keys())
-
-
+                
+                valid_frames = [
+                    frame
+                    for frame in sorted(Tvec_pose_left.keys())
+                    if Tvec_pose_left[frame] is not None
+                ]
+                
                 positions = np.array([
                     Tvec_pose_left[frame][:3, 3]
-                    for frame in frame_positions
+                    for frame in valid_frames
                     if Tvec_pose_left[frame] is not None
                 ])
 
                 pose_data = np.array([
                     H_to_pose(Tvec_pose_left[frame])
-                    for frame in frame_positions
+                    for frame in valid_frames
                     if Tvec_pose_left[frame] is not None
                 ])
-                print(pose_data)
+
+                experimental_data[f"experiment {i}"] = {
+                    "positions" : positions,
+                    "poses" : pose_data,
+                    "frames" : np.array(valid_frames)
+                }
+
                 x = positions[:, 0]
                 y = positions[:, 1]
                 z = positions[:, 2]
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection="3d")
-
+                ax.set_title(f"{experiments[experiment_number-1]} experiment(n={i})")
                 ax.plot(x, y, z)
                 ax.scatter(x[0], y[0], z[0], label="Start")
                 ax.scatter(x[-1], y[-1], z[-1], label="End")
@@ -652,8 +673,143 @@ elif int(choice) == 3:
                 ax.set_ylabel("Y [m]")
                 ax.set_zlabel("Z [m]")
                 ax.legend()
+        
 
-                plt.show()
+        n_points = 1000
+        common_progress = np.linspace(0,1,n_points)
+        resampled_positions = []
+        resampled_quaternions = []
+        durations = []
+        mean_quaternions = []
+
+
+
+        for experiment in experimental_data.values():
+            t = np.asarray([experiment["frames"]], dtype = float).flatten()
+            rotational_progress = np.linspace(0, 1, len(experiment["poses"]))
+            rotations = R.from_quat(experiment["poses"])  
+            slerp = Slerp(rotational_progress, rotations)
+            rotation_interp = slerp(common_progress)
+            quat_interp = rotation_interp.as_quat()
+            position = np.asarray([experiment["positions"]], dtype = float)
+            position = np.squeeze(position)
+            translational_progress = (t-t[0])/(t[-1]-t[0])
+            x = np.interp(common_progress, translational_progress ,position[:, 0])
+            y = np.interp(common_progress, translational_progress, position[:,1])
+            z = np.interp(common_progress, translational_progress, position[:,2])
+
+            resampled = np.column_stack([x, y, z])
+            resampled_positions.append(resampled)
+            durations.append(t[-1]-t[0])
+            resampled_quaternions.append(quat_interp)
+        resampled_quaternions = np.array(resampled_quaternions)
+        median_duration = np.median(durations)/60
+        for i in range(len(common_progress)):
+            rotations_at_i = R.from_quat(resampled_quaternions[:, i, :])
+            mean_rotation = rotations_at_i.mean()
+
+            mean_quaternions.append(mean_rotation.as_quat())
+        mean_quaternions = np.array(mean_quaternions)
+        time_spline = common_progress * median_duration
+
+        time_sec_int = time_spline.astype(int)
+        ns_time_spline = (time_spline - time_sec_int)* 1000000000
+        int_ns_time = ns_time_spline.astype(int)
+
+        resampled_positions = np.array(resampled_positions)
+        mean_trajectory = np.mean(resampled_positions, axis = 0)
+        std_trajectory = np.std(resampled_positions, axis=0)
+        x_spline = make_smoothing_spline(common_progress, mean_trajectory[:, 0], lam=0.00001)
+        y_spline = make_smoothing_spline(common_progress, mean_trajectory[:, 1], lam=0.00001)
+        z_spline = make_smoothing_spline(common_progress, mean_trajectory[:, 2], lam=0.00001)
+
+
+        x_smooth = x_spline(common_progress)
+        y_smooth = y_spline(common_progress)
+        z_smooth = z_spline(common_progress)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.set_title(f"{experiments[experiment_number-1]} splined graph")
+        ax.plot(mean_trajectory[:,0], mean_trajectory[:,1], mean_trajectory[:,2], label = "Mean trajectory")
+        ax.scatter( mean_trajectory[:,0][0],  mean_trajectory[:,1][0],  mean_trajectory[:,2][0], label="Start")
+        ax.scatter( mean_trajectory[:,0][-1],  mean_trajectory[:,1][-1],  mean_trajectory[:,2][-1], label="End")
+        max_range = max(
+            mean_trajectory[:,0].max() - mean_trajectory[:,0].min(),
+            mean_trajectory[:,1].max() - mean_trajectory[:,1].min(),
+            mean_trajectory[:,2].max() - mean_trajectory[:,2].min()
+        )
+
+        # Centre of each axis
+        x_mid = ( mean_trajectory[:,0].max() +  mean_trajectory[:,0].min()) / 2
+        y_mid = ( mean_trajectory[:,1].max() +  mean_trajectory[:,1].min()) / 2
+        z_mid = ( mean_trajectory[:,2].max() +  mean_trajectory[:,2].min()) / 2
+
+        half = max_range / 2
+
+        ax.set_xlim(x_mid - half, x_mid + half)
+        ax.set_ylim(y_mid - half, y_mid + half)
+        ax.set_zlim(z_mid - half, z_mid + half)
+
+        ax.set_box_aspect((1, 1, 1))
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        ax.set_zlabel("Z [m]")
+        
+        ax.plot(
+            x_smooth,
+            y_smooth,
+            z_smooth,
+            label="Spline"
+        )
+
+        step = 30
+        axis_length = 0.03
+        for i in range(0,len(quat_interp),step):
+            rot = R.from_quat(mean_quaternions[i])
+            R_mat = rot.as_matrix()
+
+            x_axis = R_mat[:, 0] * axis_length
+            y_axis = R_mat[:, 1] * axis_length
+            z_axis = R_mat[:, 2] * axis_length
+
+            ax.quiver(
+                x_smooth[i], y_smooth[i], z_smooth[i],
+                x_axis[0], x_axis[1], x_axis[2]
+            )
+
+            ax.quiver(
+                x_smooth[i], y_smooth[i], z_smooth[i],
+                y_axis[0], y_axis[1], y_axis[2]
+            )
+
+            ax.quiver(
+                x_smooth[i], y_smooth[i], z_smooth[i],
+                z_axis[0], z_axis[1], z_axis[2]
+            )
+        ax.legend()
+        
+        plt.show()
+
+        print(mean_trajectory[0])
+        print([x_smooth[0], y_smooth[0], z_smooth[0]])
+
+        print(mean_trajectory[-1])
+        print([x_smooth[-1], y_smooth[-1], z_smooth[-1]])
+
+        smoothed_experimental_data = {
+            "NS_1.franka_robot_state_broadcaster.current_pose.header.stamp.sec" : time_sec_int,
+            "NS_1.franka_robot_state_broadcaster.current_pose.header.stamp.nanosec" : int_ns_time,
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.orientation.w" : mean_quaternions[:,0],
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.orientation.x" : mean_quaternions[:,1],
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.orientation.y" : mean_quaternions[:,2],
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.orientation.z" : mean_quaternions[:,3],
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.position.x" : x_smooth,
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.position.y" : y_smooth,
+            "NS_1.franka_robot_state_broadcaster.current_pose.pose.position.z" : z_smooth
+        }
+        df = pd.DataFrame(smoothed_experimental_data)
+        df.to_csv(f"Trajectory {experiments[int(experiment_number) - 1]}.csv", index = False)
                                 
 print("Markers missed left", counters["left_missing"],"/", counters["total"])
 print("Markers missed right", counters["right_missing"],"/", counters["total"])
